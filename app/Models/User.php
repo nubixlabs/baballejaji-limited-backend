@@ -4,6 +4,7 @@ namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 
@@ -21,6 +22,7 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
+        'role_id',
     ];
 
     /**
@@ -44,5 +46,45 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
         ];
+    }
+
+    /**
+     * Get the role that belongs to the user.
+     */
+    public function role(): BelongsTo
+    {
+        return $this->belongsTo(Role::class);
+    }
+
+    /**
+     * Check if user has a specific role
+     */
+    public function hasRole(string $role): bool
+    {
+        return $this->role?->name === $role;
+    }
+
+    /**
+     * Check if user is filling station
+     */
+    public function isFillingStation(): bool
+    {
+        return $this->hasRole('filling_station');
+    }
+
+    /**
+     * Check if user is transport
+     */
+    public function isTransport(): bool
+    {
+        return $this->hasRole('transport');
+    }
+
+    /**
+     * Check if user is spare parts
+     */
+    public function isSpareParts(): bool
+    {
+        return $this->hasRole('spare_parts');
     }
 }

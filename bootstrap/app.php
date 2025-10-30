@@ -12,8 +12,25 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        //
+        $middleware->use([\Illuminate\Http\Middleware\HandleCors::class]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
-        //
+        $exceptions->render(function (Throwable $e, $request) {
+            if ($request->is('api/*')) {
+                $status = 500;
+                if ($e instanceof Symfony\Component\HttpKernel\Exception\HttpExceptionInterface) {
+                    $status = $e->getStatusCode();
+                } elseif ($e instanceof Illuminate\Validation\ValidationException) {
+                    $status = 422;
+                    return response()->json([
+                        'message' => 'Validation failed',
+                        'errors' => $e->errors(),
+                    ], $status);
+                }
+
+                return response()->json([
+                    'message' => $e->getMessage() ?: 'Server Error',
+                ], $status);
+            }
+        });
     })->create();

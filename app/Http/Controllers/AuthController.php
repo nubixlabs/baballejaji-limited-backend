@@ -11,7 +11,31 @@ use Illuminate\Validation\ValidationException;
 class AuthController extends Controller
 {
     /**
-     * Login user and return user data with role information
+     * @OA\Post(
+     *   path="/api/auth/login",
+     *   summary="Login and get tokens",
+     *   tags={"Auth"},
+     *   @OA\RequestBody(
+     *     required=true,
+     *     @OA\JsonContent(
+     *       required={"email","password"},
+     *       @OA\Property(property="email", type="string", format="email"),
+     *       @OA\Property(property="password", type="string", format="password")
+     *     )
+     *   ),
+     *   @OA\Response(
+     *     response=200,
+     *     description="Login successful",
+     *     @OA\JsonContent(
+     *       @OA\Property(property="user", type="object"),
+     *       @OA\Property(property="accessToken", type="string"),
+     *       @OA\Property(property="refreshToken", type="string"),
+     *       @OA\Property(property="tokenType", type="string", example="Bearer")
+     *     )
+     *   ),
+     *   @OA\Response(response=422, description="Validation error")
+     * )
+     * Login user and return user data with role information and tokens
      */
     public function login(Request $request)
     {
@@ -68,6 +92,10 @@ class AuthController extends Controller
             ]);
         }
 
+        // Create access and refresh tokens (Sanctum personal access tokens)
+        $accessToken = $user->createToken('access-token', ['access'])->plainTextToken;
+        $refreshToken = $user->createToken('refresh-token', ['refresh'])->plainTextToken;
+
         return response()->json([
             'user' => [
                 'id' => $user->id,
@@ -79,6 +107,9 @@ class AuthController extends Controller
                     'display_name' => $user->role->display_name,
                 ] : null,
             ],
+            'accessToken' => $accessToken,
+            'refreshToken' => $refreshToken,
+            'tokenType' => 'Bearer',
             'message' => 'Login successful',
         ]);
     }

@@ -26,13 +26,13 @@ class UserSeeder extends Seeder
                 'name' => 'Total Filling Station',
                 'email' => 'fillingstation@baballejaji.com',
                 'password' => Hash::make('password123'),
-                'role_id' => $fillingStationRole->id,
+                'role_id' => $fillingStationRole?->id,
             ],
             [
                 'name' => 'Oando Station Manager',
                 'email' => 'oando@baballejaji.com',
                 'password' => Hash::make('password123'),
-                'role_id' => $fillingStationRole->id,
+                'role_id' => $fillingStationRole?->id,
             ],
 
             // Transport Users
@@ -40,13 +40,13 @@ class UserSeeder extends Seeder
                 'name' => 'ABC Transport',
                 'email' => 'transport@baballejaji.com',
                 'password' => Hash::make('password123'),
-                'role_id' => $transportRole->id,
+                'role_id' => $transportRole?->id,
             ],
             [
                 'name' => 'XYZ Logistics',
                 'email' => 'logistics@baballejaji.com',
                 'password' => Hash::make('password123'),
-                'role_id' => $transportRole->id,
+                'role_id' => $transportRole?->id,
             ],
 
             // Spare Parts Users
@@ -54,18 +54,21 @@ class UserSeeder extends Seeder
                 'name' => 'Auto Parts Pro',
                 'email' => 'spareparts@baballejaji.com',
                 'password' => Hash::make('password123'),
-                'role_id' => $sparePartsRole->id,
+                'role_id' => $sparePartsRole?->id,
             ],
             [
                 'name' => 'Car Parts Hub',
                 'email' => 'carparts@baballejaji.com',
                 'password' => Hash::make('password123'),
-                'role_id' => $sparePartsRole->id,
+                'role_id' => $sparePartsRole?->id,
             ],
         ];
 
         foreach ($users as $userData) {
-            User::create($userData);
+            User::firstOrCreate(
+                ['email' => $userData['email']],
+                $userData
+            );
         }
     }
 }

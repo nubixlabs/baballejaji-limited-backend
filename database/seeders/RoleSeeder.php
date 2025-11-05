@@ -31,7 +31,10 @@ class RoleSeeder extends Seeder
         ];
 
         foreach ($roles as $role) {
-            Role::create($role);
+            Role::firstOrCreate(
+                ['name' => $role['name']], // check this unique column first
+                $role // create if not found
+            );
         }
     }
 }

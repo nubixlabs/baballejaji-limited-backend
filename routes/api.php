@@ -40,4 +40,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/dashboard/stats', [DashboardController::class, 'stats']);
     Route::get('/reports/sales', [ReportsController::class, 'sales']);
     Route::get('/reports/top-selling', [ReportsController::class, 'topSelling']);
+    Route::get('/reports/supplier-performance', [ReportsController::class, 'supplierPerformance']);
+    Route::get('/reports/inventory-analysis', [ReportsController::class, 'inventoryAnalysis']);
+    Route::get('/reports/customer-insights', [ReportsController::class, 'customerInsights']);
 });

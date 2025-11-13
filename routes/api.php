@@ -68,6 +68,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/dashboard/stats', [DashboardController::class, 'stats']);
     Route::get('/reports/sales', [ReportsController::class, 'sales']);
     Route::get('/reports/top-selling', [ReportsController::class, 'topSelling']);
+<<<<<<< HEAD
 
     // Filling Station - Products
     Route::prefix('filling')->group(function () {
@@ -258,4 +259,9 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::put('/payments/{payment}', [PaymentController::class, 'update']);
         Route::delete('/payments/{payment}', [PaymentController::class, 'destroy']);
     });
+=======
+    Route::get('/reports/supplier-performance', [ReportsController::class, 'supplierPerformance']);
+    Route::get('/reports/inventory-analysis', [ReportsController::class, 'inventoryAnalysis']);
+    Route::get('/reports/customer-insights', [ReportsController::class, 'customerInsights']);
+>>>>>>> a2298868af3d723b5c3f5a95af14926855c41b07
 });

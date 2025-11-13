@@ -6,6 +6,7 @@ namespace App\Models;
 use Laravel\Sanctum\HasApiTokens;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 
@@ -22,8 +23,15 @@ class User extends Authenticatable
     protected $fillable = [
         'name',
         'email',
+        'phone',
+        'username',
         'password',
         'role_id',
+        'user_group_id',
+        'last_login_at',
+        'last_login_ip',
+        'last_login_user_agent',
+        'is_active',
     ];
 
     /**
@@ -45,7 +53,9 @@ class User extends Authenticatable
     {
         return [
             'email_verified_at' => 'datetime',
+            'last_login_at' => 'datetime',
             'password' => 'hashed',
+            'is_active' => 'boolean',
         ];
     }
 
@@ -87,5 +97,61 @@ class User extends Authenticatable
     public function isSpareParts(): bool
     {
         return $this->hasRole('spare_parts');
+    }
+
+    /**
+     * Get the user group that belongs to the user.
+     */
+    public function userGroup(): BelongsTo
+    {
+        return $this->belongsTo(UserGroup::class);
+    }
+
+    /**
+     * Get the activity logs for the user.
+     */
+    public function activityLogs(): HasMany
+    {
+        return $this->hasMany(ActivityLog::class);
+    }
+
+    /**
+     * Get the login logs for the user.
+     */
+    public function loginLogs(): HasMany
+    {
+        return $this->hasMany(LoginLog::class);
+    }
+
+    /**
+     * Log user activity
+     */
+    public function logActivity(string $action, string $description, array $properties = []): void
+    {
+        $this->activityLogs()->create([
+            'action' => $action,
+            'description' => $description,
+            'properties' => $properties,
+            'ip_address' => request()->ip(),
+            'user_agent' => request()->userAgent(),
+        ]);
+    }
+
+    /**
+     * Log user login
+     */
+    public function logLogin(): void
+    {
+        $this->loginLogs()->create([
+            'ip_address' => request()->ip(),
+            'user_agent' => request()->userAgent(),
+            'login_at' => now(),
+        ]);
+
+        $this->update([
+            'last_login_at' => now(),
+            'last_login_ip' => request()->ip(),
+            'last_login_user_agent' => request()->userAgent(),
+        ]);
     }
 }

@@ -23,6 +23,22 @@ class SupplierController extends Controller
     }
 
     /**
+     * @OA\Get(
+     *   path="/api/suppliers/{id}",
+     *   summary="Get supplier by ID",
+     *   tags={"Suppliers"},
+     *   security={{"bearerAuth":{}}},
+     *   @OA\Parameter(name="id", in="path", required=true, @OA\Schema(type="integer")),
+     *   @OA\Response(response=200, description="Supplier details")
+     * )
+     */
+    public function show(int $id)
+    {
+        $supplier = Supplier::findOrFail($id);
+        return response()->json($supplier);
+    }
+
+    /**
      * @OA\Post(
      *   path="/api/suppliers",
      *   summary="Create new supplier",

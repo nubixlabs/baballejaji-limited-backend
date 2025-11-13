@@ -16,6 +16,12 @@ class DatabaseSeeder extends Seeder
         $this->call([
             RoleSeeder::class,
             UserSeeder::class,
+            ProductSeeder::class,
+            SupplierSeeder::class,
+            AccountSeeder::class,
+            SettingSeeder::class,
+            UserGroupSeeder::class,
+            DefaultUserSeeder::class,
         ]);
 
         // Create test user without role for development

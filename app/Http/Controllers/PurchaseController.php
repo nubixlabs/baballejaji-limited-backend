@@ -1,0 +1,221 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\Purchase;
+use App\Models\PurchaseItem;
+use App\Models\Product;
+use Illuminate\Http\Request;
+use Illuminate\Support\Str;
+use Illuminate\Support\Facades\DB;
+
+class PurchaseController extends Controller
+{
+    /**
+     * Get all purchases
+     */
+    public function index(Request $request)
+    {
+        $query = Purchase::with(['supplier', 'items.product']);
+
+        // Filter by supplier
+        if ($request->has('supplier_id')) {
+            $query->where('supplier_id', $request->supplier_id);
+        }
+
+        // Filter by status
+        if ($request->has('status')) {
+            $query->where('status', $request->status);
+        }
+
+        // Filter by date range
+        if ($request->has('date_from')) {
+            $query->where('purchase_date', '>=', $request->date_from);
+        }
+        if ($request->has('date_to')) {
+            $query->where('purchase_date', '<=', $request->date_to);
+        }
+
+        $purchases = $query->orderByDesc('purchase_date')->get();
+        return response()->json($purchases);
+    }
+
+    /**
+     * Get purchase by ID
+     */
+    public function show(int $id)
+    {
+        $purchase = Purchase::with(['supplier', 'items.product'])->findOrFail($id);
+        return response()->json($purchase);
+    }
+
+    /**
+     * Store a new purchase
+     */
+    public function store(Request $request)
+    {
+        $validated = $request->validate([
+            'supplier_id' => 'required|exists:suppliers,id',
+            'purchase_date' => 'required|date',
+            'expected_delivery_date' => 'nullable|date',
+            'items' => 'required|array|min:1',
+            'items.*.product_id' => 'required|exists:products,id',
+            'items.*.quantity' => 'required|numeric|min:0',
+            'items.*.price' => 'required|numeric|min:0',
+            'discount' => 'nullable|numeric|min:0',
+            'tax' => 'nullable|numeric|min:0',
+            'status' => 'nullable|string|in:pending,received,partial,completed',
+            'notes' => 'nullable|string',
+        ]);
+
+        DB::beginTransaction();
+        try {
+            // Generate purchase number
+            $purchaseNumber = 'PUR-' . strtoupper(Str::random(10));
+
+            // Calculate totals
+            $totalAmount = 0;
+            foreach ($validated['items'] as $item) {
+                $totalAmount += $item['quantity'] * $item['price'];
+            }
+
+            $discount = $validated['discount'] ?? 0;
+            $tax = $validated['tax'] ?? 0;
+            $grandTotal = $totalAmount - $discount + $tax;
+
+            // Create purchase
+            $purchase = Purchase::create([
+                'purchase_number' => $purchaseNumber,
+                'supplier_id' => $validated['supplier_id'],
+                'purchase_date' => $validated['purchase_date'],
+                'expected_delivery_date' => $validated['expected_delivery_date'] ?? null,
+                'total_amount' => $totalAmount,
+                'discount' => $discount,
+                'tax' => $tax,
+                'grand_total' => $grandTotal,
+                'status' => $validated['status'] ?? 'pending',
+                'notes' => $validated['notes'] ?? null,
+                'created_by' => $request->user()->id,
+            ]);
+
+            // Create purchase items
+            foreach ($validated['items'] as $item) {
+                PurchaseItem::create([
+                    'purchase_id' => $purchase->id,
+                    'product_id' => $item['product_id'],
+                    'quantity' => $item['quantity'],
+                    'received_quantity' => 0,
+                    'price' => $item['price'],
+                    'amount' => $item['quantity'] * $item['price'],
+                ]);
+            }
+
+            DB::commit();
+            return response()->json($purchase->load(['supplier', 'items.product']), 201);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json(['message' => 'Error creating purchase: ' . $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Receive purchase items
+     */
+    public function receive(Request $request, int $id)
+    {
+        $purchase = Purchase::with('items')->findOrFail($id);
+
+        $validated = $request->validate([
+            'items' => 'required|array',
+            'items.*.id' => 'required|exists:purchase_items,id',
+            'items.*.received_quantity' => 'required|numeric|min:0',
+        ]);
+
+        DB::beginTransaction();
+        try {
+            $allReceived = true;
+            foreach ($validated['items'] as $itemData) {
+                $purchaseItem = PurchaseItem::where('purchase_id', $id)
+                    ->where('id', $itemData['id'])
+                    ->firstOrFail();
+
+                $receivedQty = $itemData['received_quantity'];
+                $purchaseItem->received_quantity = $receivedQty;
+                $purchaseItem->save();
+
+                // Update product quantity if received
+                if ($receivedQty > 0) {
+                    $product = Product::find($purchaseItem->product_id);
+                    if ($product) {
+                        $product->quantity += $receivedQty;
+                        $product->save();
+                    }
+                }
+
+                // Check if all items are received
+                if ($purchaseItem->received_quantity < $purchaseItem->quantity) {
+                    $allReceived = false;
+                }
+            }
+
+            // Update purchase status
+            if ($allReceived) {
+                $purchase->status = 'completed';
+            } else {
+                $purchase->status = 'partial';
+            }
+            $purchase->save();
+
+            DB::commit();
+            return response()->json($purchase->load(['supplier', 'items.product']));
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json(['message' => 'Error receiving purchase: ' . $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Update a purchase
+     */
+    public function update(Request $request, int $id)
+    {
+        $purchase = Purchase::findOrFail($id);
+
+        $validated = $request->validate([
+            'supplier_id' => 'sometimes|required|exists:suppliers,id',
+            'purchase_date' => 'sometimes|required|date',
+            'expected_delivery_date' => 'nullable|date',
+            'discount' => 'nullable|numeric|min:0',
+            'tax' => 'nullable|numeric|min:0',
+            'status' => 'nullable|string|in:pending,received,partial,completed',
+            'notes' => 'nullable|string',
+        ]);
+
+        // Recalculate grand total if discount or tax changed
+        if (isset($validated['discount']) || isset($validated['tax'])) {
+            $totalAmount = $purchase->total_amount;
+            $discount = $validated['discount'] ?? $purchase->discount;
+            $tax = $validated['tax'] ?? $purchase->tax;
+            $validated['grand_total'] = $totalAmount - $discount + $tax;
+        }
+
+        $purchase->update($validated);
+        return response()->json($purchase->load(['supplier', 'items.product']));
+    }
+
+    /**
+     * Delete a purchase
+     */
+    public function destroy(int $id)
+    {
+        $purchase = Purchase::findOrFail($id);
+        
+        if ($purchase->status === 'completed' || $purchase->status === 'partial') {
+            return response()->json(['message' => 'Cannot delete purchase that has been received'], 400);
+        }
+
+        $purchase->delete();
+        return response()->json(['message' => 'Purchase deleted successfully']);
+    }
+}
+

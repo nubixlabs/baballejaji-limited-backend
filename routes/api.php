@@ -33,6 +33,9 @@ use App\Http\Controllers\AccountController;
 use App\Http\Controllers\VoucherController;
 use App\Http\Controllers\JournalEntryController;
 use App\Http\Controllers\PaymentController;
+use App\Http\Controllers\DepartmentController;
+use App\Http\Controllers\LevelController;
+use App\Http\Controllers\StaffController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -68,7 +71,6 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/dashboard/stats', [DashboardController::class, 'stats']);
     Route::get('/reports/sales', [ReportsController::class, 'sales']);
     Route::get('/reports/top-selling', [ReportsController::class, 'topSelling']);
-<<<<<<< HEAD
 
     // Filling Station - Products
     Route::prefix('filling')->group(function () {
@@ -258,10 +260,28 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/payments', [PaymentController::class, 'store']);
         Route::put('/payments/{payment}', [PaymentController::class, 'update']);
         Route::delete('/payments/{payment}', [PaymentController::class, 'destroy']);
+
+        // HR - Departments
+        Route::get('/departments', [DepartmentController::class, 'index']);
+        Route::post('/departments', [DepartmentController::class, 'store']);
+        Route::get('/departments/export', [DepartmentController::class, 'export']);
+        Route::get('/departments/{id}', [DepartmentController::class, 'show'])->whereNumber('id');
+
+        // HR - Levels
+        Route::get('/levels', [LevelController::class, 'index']);
+        Route::post('/levels', [LevelController::class, 'store']);
+        Route::put('/levels/{id}', [LevelController::class, 'update']);
+        Route::delete('/levels/{id}', [LevelController::class, 'destroy']);
+        Route::get('/levels/export', [LevelController::class, 'export']);
+
+        // HR - Staff
+        Route::get('/staff', [StaffController::class, 'index']);
+        Route::get('/staff/{id}', [StaffController::class, 'show']);
+        Route::post('/staff', [StaffController::class, 'store']);
+        Route::put('/staff/{id}', [StaffController::class, 'update']);
+        Route::delete('/staff/{id}', [StaffController::class, 'destroy']);
     });
-=======
     Route::get('/reports/supplier-performance', [ReportsController::class, 'supplierPerformance']);
     Route::get('/reports/inventory-analysis', [ReportsController::class, 'inventoryAnalysis']);
     Route::get('/reports/customer-insights', [ReportsController::class, 'customerInsights']);
->>>>>>> a2298868af3d723b5c3f5a95af14926855c41b07
 });

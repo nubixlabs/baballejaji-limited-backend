@@ -36,6 +36,11 @@ use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\DepartmentController;
 use App\Http\Controllers\LevelController;
 use App\Http\Controllers\StaffController;
+use App\Http\Controllers\LoanController;
+use App\Http\Controllers\AttendanceController;
+use App\Http\Controllers\VacationController;
+use App\Http\Controllers\PayslipController;
+use App\Http\Controllers\SalaryPaymentController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -280,6 +285,43 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/staff', [StaffController::class, 'store']);
         Route::put('/staff/{id}', [StaffController::class, 'update']);
         Route::delete('/staff/{id}', [StaffController::class, 'destroy']);
+
+        // Loans
+        Route::get('/loans', [LoanController::class, 'index']);
+        Route::post('/loans', [LoanController::class, 'store']);
+        Route::put('/loans/{id}', [LoanController::class, 'update']);
+        Route::delete('/loans/{id}', [LoanController::class, 'destroy']);
+        Route::get('/loans/export', [LoanController::class, 'export']);
+        Route::get('/loans/export-pdf', [LoanController::class, 'exportPdf']);
+
+        // Attendance
+        Route::get('/attendance/summary', [AttendanceController::class, 'summary']);
+        Route::get('/attendance/summary/export', [AttendanceController::class, 'summaryExport']);
+        Route::get('/attendance/summary/export-pdf', [AttendanceController::class, 'summaryExportPdf']);
+        Route::post('/attendance', [AttendanceController::class, 'store']);
+        Route::get('/attendance/holidays', [AttendanceController::class, 'holidaysList']);
+        Route::post('/attendance/holidays', [AttendanceController::class, 'holidaysStore']);
+        Route::delete('/attendance/holidays/{id}', [AttendanceController::class, 'holidaysDestroy']);
+
+        // Vacations
+        Route::get('/vacations', [VacationController::class, 'index']);
+        Route::post('/vacations', [VacationController::class, 'store']);
+        Route::put('/vacations/{id}', [VacationController::class, 'update']);
+        Route::delete('/vacations/{id}', [VacationController::class, 'destroy']);
+        Route::get('/vacations/export', [VacationController::class, 'export']);
+        Route::get('/vacations/export-pdf', [VacationController::class, 'exportPdf']);
+
+        // Payslips
+        Route::post('/payslips/generate', [PayslipController::class, 'generate']);
+        Route::get('/payslips', [PayslipController::class, 'index']);
+        Route::get('/payslips/export', [PayslipController::class, 'export']);
+        Route::get('/payslips/export-pdf', [PayslipController::class, 'exportPdf']);
+
+        // Salary Payments
+        Route::post('/salary-payments', [SalaryPaymentController::class, 'store']);
+        Route::get('/salary-payments', [SalaryPaymentController::class, 'index']);
+        Route::get('/salary-payments/export', [SalaryPaymentController::class, 'export']);
+        Route::get('/salary-payments/export-pdf', [SalaryPaymentController::class, 'exportPdf']);
     });
     Route::get('/reports/supplier-performance', [ReportsController::class, 'supplierPerformance']);
     Route::get('/reports/inventory-analysis', [ReportsController::class, 'inventoryAnalysis']);

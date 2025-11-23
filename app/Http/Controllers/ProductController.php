@@ -45,7 +45,7 @@ class ProductController extends Controller
      */
     public function show(int $id)
     {
-        $product = Product::findOrFail($id);
+        $product = Product::with(['creator', 'lastModifier'])->findOrFail($id);
         return response()->json($product);
     }
 

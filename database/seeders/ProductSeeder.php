@@ -50,7 +50,8 @@ class ProductSeeder extends Seeder
                 $productData
             );
         }
-
+     
+        
         $this->command->info('Products seeded successfully!');
     }
 }

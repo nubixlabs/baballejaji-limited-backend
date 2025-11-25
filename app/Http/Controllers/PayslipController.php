@@ -28,11 +28,11 @@ class PayslipController extends Controller
         $dateTo = $dateFrom->copy()->endOfMonth();
         $levelIds = $request->input('level_ids', []);
 
-        $staffQuery = Staff::query();
+        $staffQuery = Staff::query()->with('level');
         if (!empty($levelIds)) {
             $staffQuery->whereIn('level_id', $levelIds);
         }
-        $staff = $staffQuery->get(['id','firstname','surname','department_id','level_id','date_of_employment']);
+        $staff = $staffQuery->get();
         $generated = 0;
         $batchId = now()->timestamp;
 
@@ -48,17 +48,31 @@ class PayslipController extends Controller
                     ->whereBetween('date', [$dateFrom->toDateString(), $dateTo->toDateString()])
                     ->distinct()->count('date');
 
+                // Calculate Pay
+                $pay = 0;
+                if ($s->level) {
+                    $rate = (float)$s->level->basic_pay_rate;
+                    $period = strtolower($s->level->basic_pay_period ?? 'monthly');
+                    
+                    if ($period === 'daily') {
+                        $pay = $rate * $daysWorked;
+                    } else {
+                        // Default to monthly flat rate
+                        $pay = $rate;
+                    }
+                }
+
                 Payslip::create([
                     'employee_id' => $s->id,
                     'emp_id' => (string)$s->id,
                     'department_id' => $s->department_id,
                     'level_id' => $s->level_id,
-                    'salary_period' => 'monthly',
+                    'salary_period' => 'monthly', // Defaulting to monthly for now as per typical flow
                     'slip_name' => $request->input('slip_name'),
                     'date_from' => $dateFrom->toDateString(),
                     'date_to' => $dateTo->toDateString(),
                     'days_worked' => $daysWorked,
-                    'total_pay' => 0,
+                    'total_pay' => $pay,
                 ]);
                 $generated++;
             }
@@ -66,7 +80,7 @@ class PayslipController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Payslips generated',
+            'message' => 'Payslips generated successfully',
             'data' => [
                 'batch_id' => $batchId,
                 'generated_count' => $generated,
@@ -77,7 +91,10 @@ class PayslipController extends Controller
     public function index(Request $request)
     {
         $q = Payslip::query()->with(['employee:id,firstname,surname,department_id,level_id', 'department:id,name', 'level:id,name']);
-        if ($v = $request->input('salary')) $q->where('slip_name', 'like', "%$v%");
+        
+        // Filter by salary period if provided (e.g. "monthly")
+        if ($v = $request->input('salary')) $q->where('salary_period', $v);
+        
         if ($v = $request->input('find')) {
             $q->where(function($qq) use ($v) {
                 $qq->where('emp_id', 'like', "%$v%")
@@ -91,42 +108,36 @@ class PayslipController extends Controller
         if ($v = $request->input('department')) $q->where('department_id', $v);
 
         $page = (int)$request->input('page', 1);
-        $perPage = (int)$request->input('per_page', 15);
+        $perPage = (int)$request->input('per_page', 200); // Default to 200 as per requirement example
         $paginator = $q->orderByDesc('id')->paginate($perPage, ['*'], 'page', $page);
 
         $data = $paginator->getCollection()->map(function($p) {
             $e = $p->employee;
             return [
                 'id' => $p->id,
+                'salary_period' => ucfirst($p->salary_period),
+                'days_worked' => $p->days_worked,
+                'net_pay' => (float)($p->total_pay ?? 0),
                 'employee_id' => $p->employee_id,
                 'employee_name' => $e ? trim(($e->firstname ?? '').' '.($e->surname ?? '')) : '',
-                'emp_id' => $p->emp_id,
+                'employee' => $e ? [
+                    'emp_id' => $p->emp_id,
+                    'surname' => $e->surname,
+                    'firstname' => $e->firstname,
+                ] : null,
                 'department_id' => $p->department_id,
                 'department_name' => optional($p->department)->name,
                 'level_id' => $p->level_id,
                 'level_name' => optional($p->level)->name,
-                'slip_name' => (string)($p->slip_name ?? ''),
-                'period_from' => optional($p->date_from)->toDateString(),
-                'period_to' => optional($p->date_to)->toDateString(),
-                'basic' => 0,
-                'overtime' => 0,
-                'allowances' => 0,
-                'deductions' => 0,
-                'net_pay' => (float)($p->total_pay ?? 0),
-                'status' => 'unpaid',
-                'created_at' => optional($p->created_at)->toISOString(),
             ];
         })->values();
 
         return response()->json([
-            'success' => true,
+            'current_page' => $paginator->currentPage(),
             'data' => $data,
-            'pagination' => [
-                'current_page' => $paginator->currentPage(),
-                'last_page' => $paginator->lastPage(),
-                'per_page' => $paginator->perPage(),
-                'total' => $paginator->total(),
-            ],
+            'total' => $paginator->total(),
+            'per_page' => $paginator->perPage(),
+            'last_page' => $paginator->lastPage(),
         ]);
     }
 

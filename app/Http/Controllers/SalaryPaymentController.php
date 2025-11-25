@@ -14,7 +14,7 @@ class SalaryPaymentController extends Controller
 {
     public function store(Request $request)
     {
-        // Option A: payslip_ids
+        // Option A: payslip_ids (Direct payment of specific slips)
         if ($request->has('payslip_ids')) {
             $val = Validator::make($request->all(), [
                 'payslip_ids' => 'required|array|min:1',
@@ -42,7 +42,7 @@ class SalaryPaymentController extends Controller
             });
             return response()->json([
                 'success' => true,
-                'message' => 'Payments recorded',
+                'message' => 'Payments added successfully',
                 'data' => [
                     'payment_batch_id' => $batchId,
                     'paid_count' => $created,
@@ -50,7 +50,7 @@ class SalaryPaymentController extends Controller
             ]);
         }
 
-        // Option B: employee_ids and salary_period
+        // Option B: employee_ids and salary_period (Bulk payment by selection)
         $val = Validator::make($request->all(), [
             'employee_ids' => 'required|array|min:1',
             'employee_ids.*' => 'integer|exists:staff,id',
@@ -62,14 +62,39 @@ class SalaryPaymentController extends Controller
 
         $created = 0;
         $batchId = now()->timestamp;
-        DB::transaction(function () use ($request, &$created) {
-            $staff = Staff::whereIn('id', $request->input('employee_ids'))->get(['id']);
+        $dateFrom = \Carbon\Carbon::parse($request->input('date_from'));
+        
+        DB::transaction(function () use ($request, $dateFrom, &$created) {
+            $staff = Staff::whereIn('id', $request->input('employee_ids'))->get();
+            
             foreach ($staff as $s) {
+                // Try to find a relevant payslip for this period that hasn't been paid
+                // We assume 'date_from' matches the payslip's start date or is within the month
+                $payslip = Payslip::where('employee_id', $s->id)
+                    ->whereMonth('date_from', $dateFrom->month)
+                    ->whereYear('date_from', $dateFrom->year)
+                    ->latest('id')
+                    ->first();
+
+                // Check if already paid
+                if ($payslip) {
+                    $isPaid = SalaryPayment::where('payslip_id', $payslip->id)->exists();
+                    if ($isPaid) continue; // Skip if this specific payslip is paid
+                }
+
+                // If no payslip, we might skip or create a zero/ad-hoc payment. 
+                // Requirement implies "Add Payment" creates records. 
+                // We will create a payment record. If payslip exists, link it.
+                
+                $amount = $payslip ? $payslip->total_pay : 0;
+                // Fallback: if no payslip but we want to pay, maybe use basic rate? 
+                // For safety, let's stick to 0 or payslip amount to avoid overpaying without a generated slip.
+                
                 SalaryPayment::create([
-                    'payslip_id' => null,
+                    'payslip_id' => $payslip ? $payslip->id : null,
                     'employee_id' => $s->id,
                     'emp_id' => (string)$s->id,
-                    'total_pay' => 0,
+                    'total_pay' => $amount,
                     'cheque_account' => $request->input('cheque_account'),
                     'paid_at' => now(),
                 ]);
@@ -79,7 +104,7 @@ class SalaryPaymentController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Payments recorded',
+            'message' => 'Payments added successfully',
             'data' => [
                 'payment_batch_id' => $batchId,
                 'paid_count' => $created,

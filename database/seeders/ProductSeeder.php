@@ -15,7 +15,7 @@ class ProductSeeder extends Seeder
         $products = [
             [
                 'code' => 'PMS',
-                'name' => 'Premium Motor Spirit (Petrol)',
+                'name' => 'Petrol',
                 'si_unit' => 'Litres',
                 'quantity' => 50000.00,
                 'cost_price' => 580.00,
@@ -29,7 +29,7 @@ class ProductSeeder extends Seeder
             ],
             [
                 'code' => 'AGO',
-                'name' => 'Automotive Gas Oil (Diesel)',
+                'name' => 'Diesel',
                 'si_unit' => 'Litres',
                 'quantity' => 75000.00,
                 'cost_price' => 1050.00,
@@ -41,62 +41,7 @@ class ProductSeeder extends Seeder
                 'created_by' => 1,
                 'last_modified_by' => 1,
             ],
-            [
-                'code' => 'DPK',
-                'name' => 'Dual Purpose Kerosene',
-                'si_unit' => 'Litres',
-                'quantity' => 25000.00,
-                'cost_price' => 750.00,
-                'retail_price' => 850.00,
-                'dealer_price' => 820.00,
-                'bulk_price' => 800.00,
-                're_order_level' => 3000.00,
-                'iot_product' => 'DPK_TANK_01',
-                'created_by' => 1,
-                'last_modified_by' => 1,
-            ],
-            [
-                'code' => 'LPG',
-                'name' => 'Liquefied Petroleum Gas',
-                'si_unit' => 'Kg',
-                'quantity' => 5000.00,
-                'cost_price' => 800.00,
-                'retail_price' => 900.00,
-                'dealer_price' => 870.00,
-                'bulk_price' => 850.00,
-                're_order_level' => 500.00,
-                'iot_product' => 'LPG_TANK_01',
-                'created_by' => 1,
-                'last_modified_by' => 1,
-            ],
-            [
-                'code' => 'LUBRICANT',
-                'name' => 'Engine Oil & Lubricants',
-                'si_unit' => 'Litres',
-                'quantity' => 2000.00,
-                'cost_price' => 3500.00,
-                'retail_price' => 4200.00,
-                'dealer_price' => 4000.00,
-                'bulk_price' => 3800.00,
-                're_order_level' => 200.00,
-                'iot_product' => null,
-                'created_by' => 1,
-                'last_modified_by' => 1,
-            ],
-            [
-                'code' => 'ADDITIVE',
-                'name' => 'Fuel Additives',
-                'si_unit' => 'Litres',
-                'quantity' => 500.00,
-                'cost_price' => 2000.00,
-                'retail_price' => 2500.00,
-                'dealer_price' => 2300.00,
-                'bulk_price' => 2200.00,
-                're_order_level' => 50.00,
-                'iot_product' => null,
-                'created_by' => 1,
-                'last_modified_by' => 1,
-            ],
+            
         ];
 
         foreach ($products as $productData) {
@@ -105,7 +50,8 @@ class ProductSeeder extends Seeder
                 $productData
             );
         }
-
+     
+        
         $this->command->info('Products seeded successfully!');
     }
 }

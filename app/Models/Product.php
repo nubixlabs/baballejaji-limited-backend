@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Product extends Model
 {
@@ -23,6 +24,11 @@ class Product extends Model
         'iot_product',
         'created_by',
         'last_modified_by',
+    ];
+
+    protected $appends = [
+        'created_by_name',
+        'last_modified_by_name',
     ];
 
     protected $casts = [
@@ -47,6 +53,26 @@ class Product extends Model
     public function inventoryReconciliations(): HasMany
     {
         return $this->hasMany(InventoryReconciliation::class);
+    }
+
+    public function creator(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'created_by');
+    }
+
+    public function lastModifier(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'last_modified_by');
+    }
+
+    public function getCreatedByNameAttribute(): ?string
+    {
+        return optional($this->creator)->name;
+    }
+
+    public function getLastModifiedByNameAttribute(): ?string
+    {
+        return optional($this->lastModifier)->name;
     }
 }
 

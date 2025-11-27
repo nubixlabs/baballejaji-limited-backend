@@ -117,14 +117,15 @@ class PaymentController extends Controller
                 'purchase_id' => $validated['purchase_id'] ?? null,
                 'amount' => $validated['amount'],
                 'payment_method' => $validated['payment_method'],
-                'reference_number' => $validated['reference_number'],
-                'shift_id' => $validated['shift_id'],
-                'sales_revenue' => $validated['sales_revenue'],
-                'paid_by' => $validated['paid_by'],
-                'received_by' => $validated['received_by'],
-                'details' => $validated['details'],
+                'reference_number' => $validated['reference_number'] ?? null,
+                'shift_id' => $validated['shift_id'] ?? null,
+                'sales_revenue' => $validated['sales_revenue'] ?? null,
+                'paid_by' => $validated['paid_by'] ?? null,
+                'received_by' => $validated['received_by'] ?? null,
+                'details' => $validated['details'] ?? null,
                 'attachment_path' => $attachmentPath,
-                'status' => 'completed',
+                // New payments start as pending by default
+                'status' => 'pending',
                 'created_by' => auth()->id(),
             ]);
 

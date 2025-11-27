@@ -19,21 +19,42 @@ class PurchaseController extends Controller
         $query = Purchase::with(['supplier', 'items.product']);
 
         // Filter by supplier
-        if ($request->has('supplier_id')) {
+        if ($request->filled('supplier_id')) {
             $query->where('supplier_id', $request->supplier_id);
         }
 
         // Filter by status
-        if ($request->has('status')) {
+        if ($request->filled('status')) {
             $query->where('status', $request->status);
         }
 
         // Filter by date range
-        if ($request->has('date_from')) {
-            $query->where('purchase_date', '>=', $request->date_from);
+        if ($request->filled('date_from')) {
+            $query->whereDate('purchase_date', '>=', $request->date_from);
         }
-        if ($request->has('date_to')) {
-            $query->where('purchase_date', '<=', $request->date_to);
+        if ($request->filled('date_to')) {
+            $query->whereDate('purchase_date', '<=', $request->date_to);
+        }
+
+        // Filter by product via purchase items
+        if ($request->filled('product_id')) {
+            $query->whereHas('items', function ($q) use ($request) {
+                $q->where('product_id', $request->product_id);
+            });
+        }
+
+        // Filter by truck number (stored in notes field in this implementation)
+        if ($request->filled('truck_no')) {
+            $truckNo = $request->truck_no;
+            $query->where('notes', 'like', "%{$truckNo}%");
+        }
+
+        // Filter by amount range using grand_total
+        if ($request->filled('amount_from')) {
+            $query->where('grand_total', '>=', $request->amount_from);
+        }
+        if ($request->filled('amount_to')) {
+            $query->where('grand_total', '<=', $request->amount_to);
         }
 
         $purchases = $query->orderByDesc('purchase_date')->get();

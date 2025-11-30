@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Purchase;
 use App\Models\PurchaseItem;
 use App\Models\Product;
+use App\Models\Tank;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\DB;
@@ -16,7 +17,7 @@ class PurchaseController extends Controller
      */
     public function index(Request $request)
     {
-        $query = Purchase::with(['supplier', 'items.product']);
+        $query = Purchase::with(['supplier', 'items.product', 'tank']);
 
         // Filter by supplier
         if ($request->filled('supplier_id')) {
@@ -66,7 +67,7 @@ class PurchaseController extends Controller
      */
     public function show(int $id)
     {
-        $purchase = Purchase::with(['supplier', 'items.product'])->findOrFail($id);
+        $purchase = Purchase::with(['supplier', 'items.product', 'tank'])->findOrFail($id);
         return response()->json($purchase);
     }
 
@@ -85,7 +86,7 @@ class PurchaseController extends Controller
             'items.*.price' => 'required|numeric|min:0',
             'discount' => 'nullable|numeric|min:0',
             'tax' => 'nullable|numeric|min:0',
-            'status' => 'nullable|string|in:pending,received,partial,completed',
+            'status' => 'nullable|string|in:pending,approved,received,partial,completed',
             'notes' => 'nullable|string',
             'cost_breakdown' => 'nullable|array',
             'cost_breakdown.*.item' => 'required|string',
@@ -158,25 +159,33 @@ class PurchaseController extends Controller
             'items' => 'required|array',
             'items.*.id' => 'required|exists:purchase_items,id',
             'items.*.received_quantity' => 'required|numeric|min:0',
+            'tank_id' => 'nullable|exists:tanks,id',
+            'driver_name' => 'nullable|string',
+            'driver_phone' => 'nullable|string',
         ]);
 
         DB::beginTransaction();
         try {
             $allReceived = true;
+            $totalReceivedDelta = 0;
             foreach ($validated['items'] as $itemData) {
                 $purchaseItem = PurchaseItem::where('purchase_id', $id)
                     ->where('id', $itemData['id'])
                     ->firstOrFail();
 
+                $previousReceived = $purchaseItem->received_quantity;
                 $receivedQty = $itemData['received_quantity'];
+                $delta = max(0, $receivedQty - $previousReceived);
+                $totalReceivedDelta += $delta;
+
                 $purchaseItem->received_quantity = $receivedQty;
                 $purchaseItem->save();
 
                 // Update product quantity if received
-                if ($receivedQty > 0) {
+                if ($delta > 0) {
                     $product = Product::find($purchaseItem->product_id);
                     if ($product) {
-                        $product->quantity += $receivedQty;
+                        $product->quantity += $delta;
                         $product->save();
                     }
                 }
@@ -187,9 +196,29 @@ class PurchaseController extends Controller
                 }
             }
 
+            // Update tank content if provided
+            if (!empty($validated['tank_id']) && $totalReceivedDelta > 0) {
+                $tank = Tank::find($validated['tank_id']);
+                if ($tank) {
+                    $tank->content = ($tank->content ?? 0) + $totalReceivedDelta;
+                    $tank->save();
+                }
+
+                // Persist selected tank on purchase
+                $purchase->tank_id = $validated['tank_id'];
+            }
+
+            // Store driver information if provided
+            if (array_key_exists('driver_name', $validated)) {
+                $purchase->driver_name = $validated['driver_name'];
+            }
+            if (array_key_exists('driver_phone', $validated)) {
+                $purchase->driver_phone = $validated['driver_phone'];
+            }
+
             // Update purchase status
             if ($allReceived) {
-                $purchase->status = 'completed';
+                $purchase->status = 'received';
             } else {
                 $purchase->status = 'partial';
             }
@@ -216,7 +245,7 @@ class PurchaseController extends Controller
             'expected_delivery_date' => 'nullable|date',
             'discount' => 'nullable|numeric|min:0',
             'tax' => 'nullable|numeric|min:0',
-            'status' => 'nullable|string|in:pending,received,partial,completed',
+            'status' => 'nullable|string|in:pending,approved,received,partial,completed',
             'notes' => 'nullable|string',
             'cost_breakdown' => 'nullable|array',
             'cost_breakdown.*.item' => 'required|string',

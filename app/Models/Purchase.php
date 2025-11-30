@@ -26,6 +26,9 @@ class Purchase extends Model
         'truck_number',
         'waybill_number',
         'created_by',
+        'driver_name',
+        'driver_phone',
+        'tank_id',
     ];
 
     protected $casts = [
@@ -46,6 +49,11 @@ class Purchase extends Model
     public function items(): HasMany
     {
         return $this->hasMany(PurchaseItem::class);
+    }
+
+    public function tank(): BelongsTo
+    {
+        return $this->belongsTo(Tank::class);
     }
 }
 

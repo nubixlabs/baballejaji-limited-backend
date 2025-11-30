@@ -22,6 +22,9 @@ class Purchase extends Model
         'grand_total',
         'status',
         'notes',
+        'cost_breakdown',
+        'truck_number',
+        'waybill_number',
         'created_by',
     ];
 
@@ -32,6 +35,7 @@ class Purchase extends Model
         'discount' => 'decimal:2',
         'tax' => 'decimal:2',
         'grand_total' => 'decimal:2',
+        'cost_breakdown' => 'array',
     ];
 
     public function supplier(): BelongsTo
@@ -44,4 +48,5 @@ class Purchase extends Model
         return $this->hasMany(PurchaseItem::class);
     }
 }
+
 

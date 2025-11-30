@@ -44,3 +44,4 @@ class Shift extends Model
     }
 }
 
+

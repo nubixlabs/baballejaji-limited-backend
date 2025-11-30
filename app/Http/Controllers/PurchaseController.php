@@ -87,6 +87,11 @@ class PurchaseController extends Controller
             'tax' => 'nullable|numeric|min:0',
             'status' => 'nullable|string|in:pending,received,partial,completed',
             'notes' => 'nullable|string',
+            'cost_breakdown' => 'nullable|array',
+            'cost_breakdown.*.item' => 'required|string',
+            'cost_breakdown.*.amount' => 'required|numeric|min:0',
+            'truck_number' => 'nullable|string',
+            'waybill_number' => 'nullable|string',
         ]);
 
         DB::beginTransaction();
@@ -116,6 +121,9 @@ class PurchaseController extends Controller
                 'grand_total' => $grandTotal,
                 'status' => $validated['status'] ?? 'pending',
                 'notes' => $validated['notes'] ?? null,
+                'cost_breakdown' => $validated['cost_breakdown'] ?? null,
+                'truck_number' => $validated['truck_number'] ?? null,
+                'waybill_number' => $validated['waybill_number'] ?? null,
                 'created_by' => $request->user()->id,
             ]);
 
@@ -210,18 +218,81 @@ class PurchaseController extends Controller
             'tax' => 'nullable|numeric|min:0',
             'status' => 'nullable|string|in:pending,received,partial,completed',
             'notes' => 'nullable|string',
+            'cost_breakdown' => 'nullable|array',
+            'cost_breakdown.*.item' => 'required|string',
+            'cost_breakdown.*.amount' => 'required|numeric|min:0',
+            'truck_number' => 'nullable|string',
+            'waybill_number' => 'nullable|string',
+            'total_amount' => 'nullable|numeric|min:0',
+            'grand_total' => 'nullable|numeric|min:0',
+            'items' => 'nullable|array',
+            'items.*.id' => 'nullable|exists:purchase_items,id',
+            'items.*.product_id' => 'required|exists:products,id',
+            'items.*.quantity' => 'required|numeric|min:0',
+            'items.*.price' => 'required|numeric|min:0',
+            'items.*.received_quantity' => 'nullable|numeric|min:0',
+            'items.*.amount' => 'nullable|numeric|min:0',
         ]);
 
-        // Recalculate grand total if discount or tax changed
-        if (isset($validated['discount']) || isset($validated['tax'])) {
-            $totalAmount = $purchase->total_amount;
-            $discount = $validated['discount'] ?? $purchase->discount;
-            $tax = $validated['tax'] ?? $purchase->tax;
-            $validated['grand_total'] = $totalAmount - $discount + $tax;
-        }
+        DB::beginTransaction();
+        try {
+            // Handle items update if provided
+            if ($request->has('items') && is_array($request->items)) {
+                // Get existing item IDs
+                $existingItemIds = $purchase->items()->pluck('id')->toArray();
+                $newItemIds = [];
+                
+                foreach ($request->items as $item) {
+                    if (isset($item['id']) && in_array($item['id'], $existingItemIds)) {
+                        // Update existing item
+                        $purchaseItem = PurchaseItem::find($item['id']);
+                        if ($purchaseItem) {
+                            $purchaseItem->update([
+                                'product_id' => $item['product_id'],
+                                'quantity' => $item['quantity'],
+                                'received_quantity' => $item['received_quantity'] ?? $purchaseItem->received_quantity,
+                                'price' => $item['price'],
+                                'amount' => $item['amount'] ?? ($item['quantity'] * $item['price']),
+                            ]);
+                            $newItemIds[] = $item['id'];
+                        }
+                    } else {
+                        // Create new item
+                        $newItem = PurchaseItem::create([
+                            'purchase_id' => $purchase->id,
+                            'product_id' => $item['product_id'],
+                            'quantity' => $item['quantity'],
+                            'received_quantity' => $item['received_quantity'] ?? 0,
+                            'price' => $item['price'],
+                            'amount' => $item['amount'] ?? ($item['quantity'] * $item['price']),
+                        ]);
+                        $newItemIds[] = $newItem->id;
+                    }
+                }
+                
+                // Delete items that are no longer in the request
+                $itemsToDelete = array_diff($existingItemIds, $newItemIds);
+                if (!empty($itemsToDelete)) {
+                    PurchaseItem::whereIn('id', $itemsToDelete)->delete();
+                }
+            }
 
-        $purchase->update($validated);
-        return response()->json($purchase->load(['supplier', 'items.product']));
+            // Recalculate grand total if discount or tax changed
+            if (isset($validated['discount']) || isset($validated['tax'])) {
+                $totalAmount = $validated['total_amount'] ?? $purchase->total_amount;
+                $discount = $validated['discount'] ?? $purchase->discount;
+                $tax = $validated['tax'] ?? $purchase->tax;
+                $validated['grand_total'] = $totalAmount - $discount + $tax;
+            }
+
+            $purchase->update($validated);
+            
+            DB::commit();
+            return response()->json($purchase->load(['supplier', 'items.product']));
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json(['message' => 'Error updating purchase: ' . $e->getMessage()], 500);
+        }
     }
 
     /**
@@ -239,4 +310,5 @@ class PurchaseController extends Controller
         return response()->json(['message' => 'Purchase deleted successfully']);
     }
 }
+
 

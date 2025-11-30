@@ -38,3 +38,4 @@ class DailySale extends Model
     }
 }
 
+

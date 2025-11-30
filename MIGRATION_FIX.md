@@ -109,3 +109,4 @@ All migrations should show as "Ran" with a checkmark.
 - The `suppliers` table must exist before `purchases` table can be created
 - The `products` table must exist before tables that reference it (tanks, sales, etc.)
 
+

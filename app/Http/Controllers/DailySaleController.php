@@ -100,3 +100,4 @@ class DailySaleController extends Controller
     }
 }
 
+

@@ -35,3 +35,4 @@ class BulkSaleItem extends Model
     }
 }
 
+

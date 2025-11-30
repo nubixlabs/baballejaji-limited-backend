@@ -119,3 +119,4 @@ php artisan migrate
 - Price adjustments automatically update product prices
 - Inventory reconciliations update product quantities to match physical count
 
+

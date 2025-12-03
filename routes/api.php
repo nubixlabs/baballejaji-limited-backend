@@ -143,6 +143,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::put('/purchases/{id}', [PurchaseController::class, 'update']);
         Route::delete('/purchases/{id}', [PurchaseController::class, 'destroy']);
         Route::post('/purchases/{id}/receive', [PurchaseController::class, 'receive']);
+        Route::post('/purchases/{id}/return-reception', [PurchaseController::class, 'returnReception']);
 
         // Filling Station - Price Adjustments
         Route::get('/price-adjustments', [PriceAdjustmentController::class, 'index']);

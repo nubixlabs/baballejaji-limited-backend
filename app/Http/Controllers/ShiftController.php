@@ -85,13 +85,22 @@ class ShiftController extends Controller
             'date' => 'required|date',
         ]);
 
-        // Generate unique shift ID
-        $validated['shift_id'] = 'SHIFT-' . strtoupper(Str::random(8));
+        // Get the last shift record
+        $lastShift = Shift::orderBy('id', 'desc')->first();
+
+        // Generate next shift id
+        $nextId = $lastShift ? intval($lastShift->shift_id) + 1 : 1;
+
+        // Format as 3 digits with leading zeros (001, 002, 010, 120)
+        $validated['shift_id'] = str_pad($nextId, 3, '0', STR_PAD_LEFT);
+
         $validated['status'] = 'open';
 
         $shift = Shift::create($validated);
+
         return response()->json($shift, 201);
     }
+
 
     /**
      * @OA\Put(

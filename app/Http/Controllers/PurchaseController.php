@@ -86,7 +86,7 @@ class PurchaseController extends Controller
             'items.*.price' => 'required|numeric|min:0',
             'discount' => 'nullable|numeric|min:0',
             'tax' => 'nullable|numeric|min:0',
-            'status' => 'nullable|string|in:pending,approved,received,partial,completed',
+            'status' => 'nullable|string|in:pending,approved,received,partial,completed,returned',
             'notes' => 'nullable|string',
             'cost_breakdown' => 'nullable|array',
             'cost_breakdown.*.item' => 'required|string',
@@ -145,6 +145,58 @@ class PurchaseController extends Controller
         } catch (\Exception $e) {
             DB::rollBack();
             return response()->json(['message' => 'Error creating purchase: ' . $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Reverse a reception and mark purchase as returned
+     */
+    public function returnReception(Request $request, int $id)
+    {
+        $purchase = Purchase::with(['items', 'tank'])->findOrFail($id);
+
+        DB::beginTransaction();
+        try {
+            $totalToReverse = 0;
+
+            foreach ($purchase->items as $purchaseItem) {
+                $delta = $purchaseItem->received_quantity;
+                if ($delta <= 0) {
+                    continue;
+                }
+
+                $totalToReverse += $delta;
+
+                // Reduce product stock
+                $product = Product::find($purchaseItem->product_id);
+                if ($product) {
+                    $product->quantity = max(0, ($product->quantity ?? 0) - $delta);
+                    $product->save();
+                }
+
+                // Reset received quantity on item
+                $purchaseItem->received_quantity = 0;
+                $purchaseItem->save();
+            }
+
+            // Reduce tank content if linked tank exists
+            if ($totalToReverse > 0 && $purchase->tank_id) {
+                $tank = Tank::find($purchase->tank_id);
+                if ($tank) {
+                    $tank->content = max(0, ($tank->content ?? 0) - $totalToReverse);
+                    $tank->save();
+                }
+            }
+
+            // Mark purchase as returned
+            $purchase->status = 'returned';
+            $purchase->save();
+
+            DB::commit();
+            return response()->json($purchase->load(['supplier', 'items.product', 'tank']));
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json(['message' => 'Error returning reception: ' . $e->getMessage()], 500);
         }
     }
 
@@ -245,7 +297,7 @@ class PurchaseController extends Controller
             'expected_delivery_date' => 'nullable|date',
             'discount' => 'nullable|numeric|min:0',
             'tax' => 'nullable|numeric|min:0',
-            'status' => 'nullable|string|in:pending,approved,received,partial,completed',
+            'status' => 'nullable|string|in:pending,approved,received,partial,completed,returned',
             'notes' => 'nullable|string',
             'cost_breakdown' => 'nullable|array',
             'cost_breakdown.*.item' => 'required|string',

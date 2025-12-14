@@ -197,6 +197,65 @@ class ShiftController extends Controller
     }
 
     /**
+     * Save shift values (nozzle readings and credit sales)
+     */
+    public function saveValues(Request $request, int $id)
+    {
+        $shift = Shift::findOrFail($id);
+        
+        $validated = $request->validate([
+            'nozzle_readings' => 'nullable|array',
+            'nozzle_readings.*.nozzle_id' => 'required|integer|exists:nozzles,id',
+            'nozzle_readings.*.closing_reading' => 'required|numeric|min:0',
+            'nozzle_readings.*.rtt' => 'nullable|numeric|min:0',
+            'nozzle_readings.*.cash_over' => 'nullable|numeric|min:0',
+            'nozzle_readings.*.cash_shortage' => 'nullable|numeric|min:0',
+            'credit_sales' => 'nullable|array',
+            'credit_sales.*.customer_id' => 'required|integer|exists:customers,id',
+            'credit_sales.*.product_id' => 'required|integer|exists:products,id',
+            'credit_sales.*.quantity' => 'required|numeric|min:0',
+            'credit_sales.*.discount' => 'nullable|numeric|min:0',
+            'credit_sales.*.narration' => 'nullable|string',
+            'credit_sales.*.ledger_notes' => 'nullable|string',
+        ]);
+
+        // Store nozzle readings in shift's metadata or separate table
+        // For now, we'll store in a JSON column
+        if (isset($validated['nozzle_readings'])) {
+            $shift->nozzle_readings = $validated['nozzle_readings'];
+        }
+
+        // Store credit sales data
+        if (isset($validated['credit_sales'])) {
+            $shift->credit_sales_data = $validated['credit_sales'];
+        }
+
+        $shift->save();
+
+        return response()->json([
+            'message' => 'Shift values saved successfully',
+            'shift' => $shift
+        ]);
+    }
+
+    /**
+     * Delete saved shift values
+     */
+    public function deleteValues(Request $request, int $id)
+    {
+        $shift = Shift::findOrFail($id);
+        
+        // Clear nozzle readings and credit sales data
+        $shift->nozzle_readings = null;
+        $shift->credit_sales_data = null;
+        $shift->save();
+
+        return response()->json([
+            'message' => 'Shift values deleted successfully'
+        ]);
+    }
+
+    /**
      * @OA\Delete(
      *   path="/api/filling/shifts/{id}",
      *   summary="Delete shift",

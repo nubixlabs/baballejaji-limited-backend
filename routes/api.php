@@ -109,6 +109,8 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::delete('/shifts/{id}', [ShiftController::class, 'destroy']);
         Route::post('/shifts/{id}/close', [ShiftController::class, 'close']);
         Route::post('/shifts/{id}/approve', [ShiftController::class, 'approve']);
+        Route::post('/shifts/{id}/save-values', [ShiftController::class, 'saveValues']);
+        Route::delete('/shifts/{id}/delete-values', [ShiftController::class, 'deleteValues']);
 
         // Filling Station - Stock Levels
         Route::get('/stock-levels', [StockLevelController::class, 'index']);

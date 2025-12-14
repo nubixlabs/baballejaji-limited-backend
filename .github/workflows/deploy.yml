@@ -19,15 +19,19 @@ jobs:
           script: |
             PROJECT_DIR="${{ secrets.PROJECT_PATH }}"
             SSH_USER="${{ secrets.VPS_USER }}"
-            PAT_SECRET="${{ secrets.REPO_PATH }}"
+            PAT_SECRET="${{ secrets.GITHUB_PAT }}"
+            
             sudo chown -R $SSH_USER:$SSH_USER $PROJECT_DIR
             cd $PROJECT_DIR
+            
             git config --global --add safe.directory $PROJECT_DIR
+            
+            git remote set-url origin https://github.com/nubixlabs/baballejaji-limited-backend.git
+            
             git config credential.helper "echo username=nubixlabs\npassword=$PAT_SECRET"
+            
             git pull origin main
-
-
-
-
             
             
+            
+            echo "Deployment successful!"

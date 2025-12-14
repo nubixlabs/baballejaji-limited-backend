@@ -18,10 +18,16 @@ jobs:
           port: 22
           script: |
             PROJECT_DIR="${{ secrets.PROJECT_PATH }}"
-            REPO_URL="https://${{ secrets.VPS_USER }}:${{ secrets.REPO_PATH }}@github.com/nubixlabs/baballejaji-limited-backend.git"
+            SSH_USER="${{ secrets.VPS_USER }}"
+            PAT_SECRET="${{ secrets.REPO_PATH }}"
+            sudo chown -R $SSH_USER:$SSH_USER $PROJECT_DIR
             cd $PROJECT_DIR
-            sudo chown -R ${{ secrets.VPS_USER }}:${{ secrets.VPS_USER }} $PROJECT_DIR
             git config --global --add safe.directory $PROJECT_DIR
-            git remote set-url origin $REPO_URL
+            git config credential.helper "echo username=nubixlabs\npassword=$PAT_SECRET"
             git pull origin main
+
+
+
+
+            
             

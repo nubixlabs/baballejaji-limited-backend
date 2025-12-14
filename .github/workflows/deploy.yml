@@ -20,7 +20,7 @@ jobs:
           script: |
             PROJECT_DIR="${{ secrets.PROJECT_PATH }}"
             SSH_USER="${{ secrets.VPS_USER }}"
-            PAT_SECRET="${{ secrets.GITHUB_PAT }}"
+            PAT_SECRET="${{ secrets.REPO_PATH }}"
             
             # --- Permission & Context Fixes (Keep These) ---
             sudo chown -R $SSH_USER:$SSH_USER $PROJECT_DIR

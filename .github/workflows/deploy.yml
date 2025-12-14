@@ -38,4 +38,21 @@ jobs:
             echo "➡️ Pulling latest code"
             git -c http.extraheader="AUTHORIZATION: basic $(printf '%s' "nubixlabs:$PAT_SECRET" | base64)" pull origin main
 
+            echo "➡️ Installing composer dependencies"
+            composer install --no-interaction --prefer-dist --optimize-autoloader
+
+            echo "➡️ Running database migrations"
+            php artisan migrate --force
+
+            echo "➡️ Clearing and caching config/routes/views"
+            php artisan config:cache
+            php artisan route:cache
+            php artisan view:cache
+
+            echo "➡️ Setting storage permissions"
+            chmod -R 775 storage bootstrap/cache
+
+            echo "➡️ Restarting queue workers"
+            php artisan queue:restart || true
+
             echo "✅ Deployment successful!"

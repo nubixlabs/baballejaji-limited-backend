@@ -21,17 +21,21 @@ jobs:
             SSH_USER="${{ secrets.VPS_USER }}"
             PAT_SECRET="${{ secrets.GITHUB_PAT }}"
             
+            # --- Permission & Context Fixes (Keep These) ---
             sudo chown -R $SSH_USER:$SSH_USER $PROJECT_DIR
             cd $PROJECT_DIR
-            
             git config --global --add safe.directory $PROJECT_DIR
             
+            # --- Authentication Fix (The Key Changes!) ---
+
+            # 1. Reset the URL to the credential-free version
             git remote set-url origin https://github.com/nubixlabs/baballejaji-limited-backend.git
             
-            git config credential.helper "echo username=nubixlabs\npassword=$PAT_SECRET"
+            # 2. Use 'git -c' to pass the PAT as a custom HTTP header for authentication.
+            #    This avoids the faulty 'credential-echo' helper and the 'Port number' error.
+            git -c http.extraheader="AUTHORIZATION: basic $(echo -n nubixlabs:$PAT_SECRET | base64 -w0)" pull origin main
             
-            git pull origin main
-            
+            # --- Laravel Build and Cleanup ---
             
             
             echo "Deployment successful!"

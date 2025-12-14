@@ -17,5 +17,9 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           port: 22
           script: |
-            cd ${{ secrets.PROJECT_PATH }}
+            PROJECT_DIR="${{ secrets.PROJECT_PATH }}"
+            cd $PROJECT_DIR
+            sudo chown -R ${{ secrets.VPS_USER }}:${{ secrets.VPS_USER }} $PROJECT_DIR
+            git config --global --add safe.directory $PROJECT_DIR
             git pull origin main
+            

@@ -1,16 +1,16 @@
 name: Baballe Jaji Backend
 
-
 on:
   push:
-    branches: [main]
+    branches:
+      - main
 
 jobs:
-  build:
+  deploy:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Deploy using ssh
+      - name: Deploy using SSH
         uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.VPS_HOST }}
@@ -18,25 +18,24 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           port: 22
           script: |
+            set -e
+            export GIT_TERMINAL_PROMPT=0
+
             PROJECT_DIR="${{ secrets.PROJECT_PATH }}"
             SSH_USER="${{ secrets.VPS_USER }}"
-            PAT_SECRET="${{ secrets.REPO_PATH }}"
-            
-            # --- Permission & Context Fixes (Keep These) ---
-            sudo chown -R $SSH_USER:$SSH_USER $PROJECT_DIR
-            cd $PROJECT_DIR
-            git config --global --add safe.directory $PROJECT_DIR
-            
-            # --- Authentication Fix (The Key Changes!) ---
+            PAT_SECRET="${{ secrets.REPO_PAT }}"
 
-            # 1. Reset the URL to the credential-free version
+            echo "➡️ Switching to project directory"
+            sudo chown -R "$SSH_USER":"$SSH_USER" "$PROJECT_DIR"
+            cd "$PROJECT_DIR"
+
+            echo "➡️ Mark repo as safe"
+            git config --global --add safe.directory "$PROJECT_DIR"
+
+            echo "➡️ Ensure clean HTTPS remote"
             git remote set-url origin https://github.com/nubixlabs/baballejaji-limited-backend.git
-            
-            # 2. Use 'git -c' to pass the PAT as a custom HTTP header for authentication.
-            #    This avoids the faulty 'credential-echo' helper and the 'Port number' error.
-            git -c http.extraheader="AUTHORIZATION: basic $(echo -n nubixlabs:$PAT_SECRET | base64 -w0)" pull origin main
-            
-            # --- Laravel Build and Cleanup ---
-            
-            
-            echo "Deployment successful!"
+
+            echo "➡️ Pulling latest code"
+            git -c http.extraheader="AUTHORIZATION: basic $(printf '%s' "nubixlabs:$PAT_SECRET" | base64)" pull origin main
+
+            echo "✅ Deployment successful!"

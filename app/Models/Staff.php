@@ -35,6 +35,9 @@ class Staff extends Model
         'designation',
         'tax_id',
         'level_id',
+        'next_of_kin_name',
+        'next_of_kin_phone',
+        'photo',
         'created_by',
         'last_modified_by',
     ];

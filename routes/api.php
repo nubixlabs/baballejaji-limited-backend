@@ -111,6 +111,8 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/shifts/{id}/approve', [ShiftController::class, 'approve']);
         Route::post('/shifts/{id}/save-values', [ShiftController::class, 'saveValues']);
         Route::delete('/shifts/{id}/delete-values', [ShiftController::class, 'deleteValues']);
+        Route::post('/shifts/{id}/cancel', [ShiftController::class, 'cancel']);
+        Route::post('/shifts/{id}/reopen', [ShiftController::class, 'reopen']);
 
         // Filling Station - Stock Levels
         Route::get('/stock-levels', [StockLevelController::class, 'index']);
@@ -328,5 +330,7 @@ Route::middleware('auth:sanctum')->group(function () {
     });
     Route::get('/reports/supplier-performance', [ReportsController::class, 'supplierPerformance']);
     Route::get('/reports/inventory-analysis', [ReportsController::class, 'inventoryAnalysis']);
+    Route::get('/reports/shift-sales', [ReportsController::class, 'shiftSales']);
+    Route::get('/reports/meter-readings', [ReportsController::class, 'meterReadings']);
     Route::get('/reports/customer-insights', [ReportsController::class, 'customerInsights']);
 });

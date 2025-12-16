@@ -19,7 +19,7 @@ class StaffController extends Controller
         $from = $request->get('employed_from');
         $to = $request->get('employed_to');
 
-        $query = Staff::with(['department', 'level'])
+        $query = Staff::with(['department', 'level', 'creator', 'lastModifier'])
             ->when($search, function ($q) use ($search) {
                 $q->where(function ($qq) use ($search) {
                     $qq->where('surname', 'like', "%{$search}%")
@@ -68,6 +68,9 @@ class StaffController extends Controller
             'designation' => 'nullable|string|max:255',
             'tax_id' => 'nullable|string|max:255',
             'level_id' => 'nullable|exists:levels,id',
+            'next_of_kin_name' => 'nullable|string|max:255',
+            'next_of_kin_phone' => 'nullable|string|max:50',
+            'photo' => 'nullable|string|max:2048',
         ]);
 
         $validated['created_by'] = $request->user()->id ?? null;
@@ -75,7 +78,7 @@ class StaffController extends Controller
         $validated['currently_employed'] = $validated['currently_employed'] ?? 'Yes';
 
         $staff = Staff::create($validated);
-        return response()->json($staff->load(['department','level']), 201);
+        return response()->json($staff->load(['department','level','creator','lastModifier']), 201);
     }
 
     /**
@@ -110,12 +113,15 @@ class StaffController extends Controller
             'designation' => 'nullable|string|max:255',
             'tax_id' => 'nullable|string|max:255',
             'level_id' => 'nullable|exists:levels,id',
+            'next_of_kin_name' => 'nullable|string|max:255',
+            'next_of_kin_phone' => 'nullable|string|max:50',
+            'photo' => 'nullable|string|max:2048',
         ]);
 
         $validated['last_modified_by'] = $request->user()->id ?? null;
 
         $staff->update($validated);
-        return response()->json($staff->load(['department','level']));
+        return response()->json($staff->load(['department','level','creator','lastModifier']));
     }
 
     /**

@@ -22,6 +22,8 @@ class Shift extends Model
         'approved_at',
         'closed_by',
         'approved_by',
+        'nozzle_readings',
+        'credit_sales_data',
     ];
 
     protected $casts = [
@@ -31,6 +33,8 @@ class Shift extends Model
         'sales_revenue' => 'decimal:2',
         'closed_at' => 'datetime',
         'approved_at' => 'datetime',
+        'nozzle_readings' => 'array',
+        'credit_sales_data' => 'array',
     ];
 
     public function stockLevels(): HasMany
@@ -41,6 +45,11 @@ class Shift extends Model
     public function dailySales(): HasMany
     {
         return $this->hasMany(DailySale::class);
+    }
+
+    public function retailSales(): HasMany
+    {
+        return $this->hasMany(RetailSale::class);
     }
 }
 

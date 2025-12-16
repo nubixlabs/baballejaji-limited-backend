@@ -85,6 +85,14 @@ class ShiftController extends Controller
             'date' => 'required|date',
         ]);
 
+        // Check if there is already an open shift
+        $openShift = Shift::where('status', 'open')->first();
+        if ($openShift) {
+            return response()->json([
+                'message' => 'There is still an open or pending shift. Please close and approve it before openening a new shift.'
+            ], 400);
+        }
+
         // Get the last shift record
         $lastShift = Shift::orderBy('id', 'desc')->first();
 
@@ -96,7 +104,60 @@ class ShiftController extends Controller
 
         $validated['status'] = 'open';
 
+        // Snapshot Nozzle Readings (Opening Readings)
+        $nozzles = \App\Models\Nozzle::with('tank.product')->get();
+        $nozzleReadings = [];
+        foreach ($nozzles as $nozzle) {
+            $nozzleReadings[] = [
+                'nozzle_id' => $nozzle->id,
+                'nozzle_name' => $nozzle->name, // Snapshot name
+                'tank_name' => $nozzle->tank->name ?? 'N/A',
+                'product_name' => $nozzle->tank->product->name ?? 'N/A',
+                'opening_reading' => $nozzle->reading, // Current reading as opening
+                'closing_reading' => 0,
+                'qty_sold' => 0,
+                'rtt' => 0,
+                'revenue' => 0,
+                'retail_sales' => 0,
+                'retail_revenue' => 0,
+                'total_revenue' => 0,
+                'shortage' => 0,
+                'overage' => 0,
+            ];
+        }
+        $validated['nozzle_readings'] = $nozzleReadings;
+
         $shift = Shift::create($validated);
+
+        // Auto-initialize Daily Sales and Shift Sales Summary for all products
+        $products = \App\Models\Product::all();
+        foreach ($products as $product) {
+            // Keep DailySale for other purposes if needed, BUT user specifically asked for Shift Sales Summary table.
+            // We will initialize both to be safe, or just ShiftSalesSummary if DailySale is redundant.
+            // Given previous instruction "created in sale too", let's keep DailySale init as well.
+            
+            DailySale::create([
+                'shift_id' => $shift->id,
+                'product_id' => $product->id,
+                'quantity' => 0,
+                'price' => $product->retail_price,
+                'amount' => 0,
+                'date' => $shift->date,
+            ]);
+
+            \App\Models\ShiftSalesSummary::create([
+                'shift_id' => $shift->id,
+                'product_id' => $product->id,
+                'cost_price' => $product->cost_price ?? 0,
+                'pump_price' => $product->retail_price,
+                'shift_vol' => 0,
+                'shift_amount' => 0,
+                'bulk_sales' => 0,
+                'retail_sales' => 0,
+                'total_revenue' => 0,
+                'date' => $shift->date,
+            ]);
+        }
 
         return response()->json($shift, 201);
     }
@@ -252,6 +313,54 @@ class ShiftController extends Controller
 
         return response()->json([
             'message' => 'Shift values deleted successfully'
+        ]);
+    }
+
+    /**
+     * Re-open a closed shift (Return shift)
+     */
+    public function reopen(int $id)
+    {
+        $shift = Shift::findOrFail($id);
+        
+        // Only allow re-opening closed shifts
+        if ($shift->status !== 'closed') {
+            return response()->json([
+                'message' => 'Only closed shifts can be returned/re-opened.'
+            ], 400);
+        }
+
+        $shift->status = 'open';
+        $shift->closed_at = null;
+        $shift->closed_by = null;
+        $shift->save();
+
+        return response()->json([
+            'message' => 'Shift returned/re-opened successfully',
+            'shift' => $shift
+        ]);
+    }
+
+    /**
+     * Cancel a shift (Soft delete/status update)
+     */
+    public function cancel(int $id)
+    {
+        $shift = Shift::findOrFail($id);
+        
+        // Prevent cancelling if already closed or approved
+        if (in_array($shift->status, ['closed', 'approved'])) {
+            return response()->json([
+                'message' => 'Cannot cancel a closed or approved shift.'
+            ], 400);
+        }
+
+        $shift->status = 'cancelled';
+        $shift->save();
+
+        return response()->json([
+            'message' => 'Shift cancelled successfully',
+            'shift' => $shift
         ]);
     }
 

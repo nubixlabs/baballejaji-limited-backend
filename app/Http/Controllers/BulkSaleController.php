@@ -45,7 +45,7 @@ class BulkSaleController extends Controller
      */
     public function show(int $id)
     {
-        $bulkSale = BulkSale::with(['customer', 'items.product'])->findOrFail($id);
+        $bulkSale = BulkSale::with(['customer', 'items.product', 'creator'])->findOrFail($id);
         return response()->json($bulkSale);
     }
 
@@ -63,15 +63,17 @@ class BulkSaleController extends Controller
             'items.*.price' => 'required|numeric|min:0',
             'discount' => 'nullable|numeric|min:0',
             'tax' => 'nullable|numeric|min:0',
-            'payment_status' => 'nullable|string|in:pending,partial,paid',
+            'payment_status' => 'nullable|string|in:pending,partial,paid,approved',
             'payment_method' => 'nullable|string',
             'notes' => 'nullable|string',
+            'invoice_number' => 'nullable|string|unique:bulk_sales,invoice_number',
+            'shift_id' => 'nullable|exists:shifts,id',
         ]);
 
         DB::beginTransaction();
         try {
-            // Generate invoice number
-            $invoiceNumber = 'BULK-' . strtoupper(Str::random(10));
+            // Generate invoice number if not provided
+            $invoiceNumber = $validated['invoice_number'] ?? ('BULK-' . strtoupper(Str::random(10)));
 
             // Calculate totals
             $totalAmount = 0;
@@ -87,6 +89,7 @@ class BulkSaleController extends Controller
             $bulkSale = BulkSale::create([
                 'invoice_number' => $invoiceNumber,
                 'customer_id' => $validated['customer_id'],
+                'shift_id' => $validated['shift_id'] ?? null,
                 'sale_date' => $validated['sale_date'],
                 'total_amount' => $totalAmount,
                 'discount' => $discount,
@@ -136,7 +139,7 @@ class BulkSaleController extends Controller
             'sale_date' => 'sometimes|required|date',
             'discount' => 'nullable|numeric|min:0',
             'tax' => 'nullable|numeric|min:0',
-            'payment_status' => 'nullable|string|in:pending,partial,paid',
+            'payment_status' => 'nullable|string|in:pending,partial,paid,approved',
             'payment_method' => 'nullable|string',
             'notes' => 'nullable|string',
         ]);

@@ -17,6 +17,8 @@ class Shift extends Model
         'cash_sales',
         'credit_sales',
         'sales_revenue',
+        'duration',
+        'expiry_date',
         'status',
         'closed_at',
         'approved_at',
@@ -31,6 +33,7 @@ class Shift extends Model
         'cash_sales' => 'decimal:2',
         'credit_sales' => 'decimal:2',
         'sales_revenue' => 'decimal:2',
+        'expiry_date' => 'datetime',
         'closed_at' => 'datetime',
         'approved_at' => 'datetime',
         'nozzle_readings' => 'array',
@@ -50,6 +53,11 @@ class Shift extends Model
     public function retailSales(): HasMany
     {
         return $this->hasMany(RetailSale::class);
+    }
+
+    public function bulkSales(): HasMany
+    {
+        return $this->hasMany(BulkSale::class);
     }
 }
 

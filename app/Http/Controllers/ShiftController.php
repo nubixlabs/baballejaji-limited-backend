@@ -21,6 +21,11 @@ class ShiftController extends Controller
      */
     public function index(Request $request)
     {
+        // Auto-expire shifts
+        Shift::where('status', 'open')
+             ->where('expiry_date', '<', now())
+             ->update(['status' => 'expired']);
+
         $query = Shift::query();
 
         // Filter by date range
@@ -57,7 +62,13 @@ class ShiftController extends Controller
      */
     public function show(int $id)
     {
-        $shift = Shift::with(['stockLevels.product', 'dailySales.product'])->findOrFail($id);
+        $shift = Shift::with(['stockLevels.product', 'dailySales.product', 'bulkSales'])->findOrFail($id);
+        
+        // Calculate revenues
+        $shift->bulk_sales_revenue = $shift->bulkSales
+            ->where('payment_status', 'approved')
+            ->sum('grand_total');
+
         return response()->json($shift);
     }
 
@@ -83,14 +94,20 @@ class ShiftController extends Controller
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'date' => 'required|date',
+            'duration' => 'required|string',
         ]);
 
         // Check if there is already an open shift
         $openShift = Shift::where('status', 'open')->first();
         if ($openShift) {
-            return response()->json([
-                'message' => 'There is still an open or pending shift. Please close and approve it before openening a new shift.'
-            ], 400);
+            // Check if it's expired before blocking
+            if ($openShift->expiry_date && $openShift->expiry_date < now()) {
+                $openShift->update(['status' => 'expired']);
+            } else {
+                return response()->json([
+                    'message' => 'There is still an open or pending shift. Please close and approve it before opening a new shift.'
+                ], 400);
+            }
         }
 
         // Get the last shift record
@@ -103,6 +120,24 @@ class ShiftController extends Controller
         $validated['shift_id'] = str_pad($nextId, 3, '0', STR_PAD_LEFT);
 
         $validated['status'] = 'open';
+
+        // Calculate expiry date
+        $duration = $validated['duration'];
+        $expiryDate = now();
+
+        if (str_contains(strtolower($duration), 'week')) {
+            $weeks = (int) filter_var($duration, FILTER_SANITIZE_NUMBER_INT) ?: 1;
+            $expiryDate = now()->addWeeks($weeks);
+        } elseif (str_contains(strtolower($duration), 'day')) {
+            $days = (int) filter_var($duration, FILTER_SANITIZE_NUMBER_INT) ?: 1;
+            $expiryDate = now()->addDays($days);
+        } else {
+            // Assume hours if just number or contains hours
+            $hours = (int) filter_var($duration, FILTER_SANITIZE_NUMBER_INT) ?: 24;
+            $expiryDate = now()->addHours($hours);
+        }
+        
+        $validated['expiry_date'] = $expiryDate;
 
         // Snapshot Nozzle Readings (Opening Readings)
         $nozzles = \App\Models\Nozzle::with('tank.product')->get();
@@ -191,7 +226,7 @@ class ShiftController extends Controller
             'date' => 'sometimes|required|date',
             'cash_sales' => 'nullable|numeric|min:0',
             'credit_sales' => 'nullable|numeric|min:0',
-            'status' => 'sometimes|required|string|in:open,closed,approved',
+            'status' => 'sometimes|required|string|in:open,closed,approved,expired,cancelled',
         ]);
 
         // Calculate sales revenue

@@ -14,6 +14,7 @@ class BulkSale extends Model
     protected $fillable = [
         'invoice_number',
         'customer_id',
+        'shift_id',
         'sale_date',
         'total_amount',
         'discount',
@@ -41,6 +42,11 @@ class BulkSale extends Model
     public function items(): HasMany
     {
         return $this->hasMany(BulkSaleItem::class);
+    }
+
+    public function creator(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'created_by');
     }
 }
 

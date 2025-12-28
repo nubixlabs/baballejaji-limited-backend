@@ -44,6 +44,11 @@ class BulkSale extends Model
         return $this->hasMany(BulkSaleItem::class);
     }
 
+    public function distributions(): HasMany
+    {
+        return $this->hasMany(Distribution::class);
+    }
+
     public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');

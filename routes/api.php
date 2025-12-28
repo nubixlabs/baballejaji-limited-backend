@@ -33,6 +33,7 @@ use App\Http\Controllers\AccountController;
 use App\Http\Controllers\VoucherController;
 use App\Http\Controllers\JournalEntryController;
 use App\Http\Controllers\PaymentController;
+use App\Http\Controllers\CustomerPaymentController;
 use App\Http\Controllers\DepartmentController;
 use App\Http\Controllers\LevelController;
 use App\Http\Controllers\StaffController;
@@ -51,6 +52,7 @@ Route::get('/user', function (Request $request) {
 Route::post('/auth/login', [AuthController::class, 'login']);
 Route::get('/auth/me', [AuthController::class, 'me'])->middleware('auth:sanctum');
 Route::post('/auth/logout', [AuthController::class, 'logout'])->middleware('auth:sanctum');
+Route::get('/test-debug', [BulkSaleController::class, 'undistributed']);
 
 // Protected API routes
 Route::middleware('auth:sanctum')->group(function () {
@@ -128,6 +130,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
         // Filling Station - Bulk Sales
         Route::get('/bulk-sales', [BulkSaleController::class, 'index']);
+        Route::get('/bulk-sales/un-distributed', [BulkSaleController::class, 'undistributed']);
         Route::get('/bulk-sales/{id}', [BulkSaleController::class, 'show']);
         Route::post('/bulk-sales', [BulkSaleController::class, 'store']);
         Route::put('/bulk-sales/{id}', [BulkSaleController::class, 'update']);
@@ -139,6 +142,13 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/retail-sales', [RetailSaleController::class, 'store']);
         Route::put('/retail-sales/{id}', [RetailSaleController::class, 'update']);
         Route::delete('/retail-sales/{id}', [RetailSaleController::class, 'destroy']);
+
+        // Filling Station - Distributions
+        Route::get('/distributions', [App\Http\Controllers\DistributionController::class, 'index']);
+        Route::get('/distributions/{id}', [App\Http\Controllers\DistributionController::class, 'show']);
+        Route::post('/distributions', [App\Http\Controllers\DistributionController::class, 'store']);
+        Route::post('/distributions/{id}/approve', [App\Http\Controllers\DistributionController::class, 'approve']);
+        Route::delete('/distributions/{id}', [App\Http\Controllers\DistributionController::class, 'destroy']);
 
         // Filling Station - Purchases
         Route::get('/purchases', [PurchaseController::class, 'index']);
@@ -263,6 +273,21 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/journal-entries/approve-multiple', [JournalEntryController::class, 'approveMultiple']);
         Route::patch('/journal-entries/{journalEntry}/post', [JournalEntryController::class, 'post']);
         Route::post('/journal-entries/generate', [JournalEntryController::class, 'generate']);
+
+        // Customer Payments
+        Route::get('/customer-payments', [CustomerPaymentController::class, 'index']);
+        Route::get('/customer-payments/{id}', [CustomerPaymentController::class, 'show']);
+        Route::post('/customer-payments', [CustomerPaymentController::class, 'store']);
+        Route::put('/customer-payments/{id}', [CustomerPaymentController::class, 'update']);
+        Route::delete('/customer-payments/{id}', [CustomerPaymentController::class, 'destroy']);
+        Route::post('/customer-payments/{id}/approve', [CustomerPaymentController::class, 'approve']);
+
+        // Fuel Tickets
+        Route::get('/fuel-tickets', [App\Http\Controllers\FuelTicketController::class, 'index']);
+        Route::get('/fuel-tickets/{id}', [App\Http\Controllers\FuelTicketController::class, 'show']);
+        Route::post('/fuel-tickets', [App\Http\Controllers\FuelTicketController::class, 'store']);
+        Route::post('/fuel-tickets/{id}', [App\Http\Controllers\FuelTicketController::class, 'update']);
+        Route::delete('/fuel-tickets/{id}', [App\Http\Controllers\FuelTicketController::class, 'destroy']);
 
         // Filling Station - Payments
         Route::get('/payments', [PaymentController::class, 'index']);

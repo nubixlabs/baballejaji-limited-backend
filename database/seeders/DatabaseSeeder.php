@@ -22,6 +22,17 @@ class DatabaseSeeder extends Seeder
             SettingSeeder::class,
             UserGroupSeeder::class,
             DefaultUserSeeder::class,
+            
+            // Additional seeders for complete database
+            CustomerSeeder::class,
+            DepartmentSeeder::class,
+            LevelSeeder::class,
+            LocationSeeder::class,
+            TankGroupSeeder::class,
+            TankSeeder::class,
+            NozzleSeeder::class,
+            // StaffSeeder::class,  // TODO: Fix column mismatch issue
+            FuelTicketSeeder::class,
         ]);
 
         // Create test user without role for development

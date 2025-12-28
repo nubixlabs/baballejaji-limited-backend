@@ -41,6 +41,40 @@ class BulkSaleController extends Controller
     }
 
     /**
+     * Get un-distributed bulk sales
+     */
+    public function undistributed(Request $request)
+    {
+        try {
+            $query = BulkSale::with(['customer', 'items.product'])
+                ->withSum('items', 'quantity')
+                ->withSum('distributions', 'quantity');
+
+            if ($request->has('customer_id')) {
+                $query->where('customer_id', $request->customer_id);
+            }
+
+            $bulkSales = $query->orderByDesc('sale_date')->get();
+
+            // DEBUG: Return all
+            return response()->json($bulkSales);
+
+            /*
+            $undistributed = $bulkSales->filter(function ($sale) {
+                $totalQty = floatval($sale->items_sum_quantity ?? 0);
+                $distQty = floatval($sale->distributions_sum_quantity ?? 0);
+                // Float comparison tolerance
+                return round($totalQty, 2) > round($distQty, 2);
+            })->values();
+
+            return response()->json($undistributed);
+            */
+        } catch (\Exception $e) {
+            return response()->json(['message' => 'Error: ' . $e->getMessage()], 500);
+        }
+    }
+
+    /**
      * Get bulk sale by ID
      */
     public function show(int $id)

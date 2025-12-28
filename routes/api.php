@@ -29,6 +29,7 @@ use App\Http\Controllers\UserGroupController;
 use App\Http\Controllers\ActivityLogController;
 use App\Http\Controllers\LoginLogController;
 use App\Http\Controllers\SettingController;
+use App\Http\Controllers\FillingStationController;
 use App\Http\Controllers\AccountController;
 use App\Http\Controllers\VoucherController;
 use App\Http\Controllers\JournalEntryController;
@@ -42,6 +43,7 @@ use App\Http\Controllers\AttendanceController;
 use App\Http\Controllers\VacationController;
 use App\Http\Controllers\PayslipController;
 use App\Http\Controllers\SalaryPaymentController;
+use App\Http\Controllers\BankTransferController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -53,6 +55,17 @@ Route::post('/auth/login', [AuthController::class, 'login']);
 Route::get('/auth/me', [AuthController::class, 'me'])->middleware('auth:sanctum');
 Route::post('/auth/logout', [AuthController::class, 'logout'])->middleware('auth:sanctum');
 Route::get('/test-debug', [BulkSaleController::class, 'undistributed']);
+
+// Super Admin Routes
+Route::middleware('auth:sanctum')->group(function () {
+    Route::prefix('super-admin')->group(function () {
+        Route::get('/filling-stations', [FillingStationController::class, 'index']);
+        Route::get('/filling-stations/{id}', [FillingStationController::class, 'show']);
+        Route::post('/filling-stations', [FillingStationController::class, 'store']);
+        Route::put('/filling-stations/{id}', [FillingStationController::class, 'update']);
+        Route::delete('/filling-stations/{id}', [FillingStationController::class, 'destroy']);
+    });
+});
 
 // Protected API routes
 Route::middleware('auth:sanctum')->group(function () {
@@ -295,6 +308,14 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/payments', [PaymentController::class, 'store']);
         Route::put('/payments/{payment}', [PaymentController::class, 'update']);
         Route::delete('/payments/{payment}', [PaymentController::class, 'destroy']);
+
+        // Bank Transfers
+        Route::get('/bank-transfers', [BankTransferController::class, 'index']);
+        Route::get('/bank-transfers/{id}', [BankTransferController::class, 'show']);
+        Route::post('/bank-transfers', [BankTransferController::class, 'store']);
+        Route::post('/bank-transfers/{id}/approve', [BankTransferController::class, 'approve']);
+        Route::put('/bank-transfers/{id}', [BankTransferController::class, 'update']);
+        Route::delete('/bank-transfers/{id}', [BankTransferController::class, 'destroy']);
 
         // HR - Departments
         Route::get('/departments', [DepartmentController::class, 'index']);

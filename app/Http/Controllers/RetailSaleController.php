@@ -129,28 +129,83 @@ class RetailSaleController extends Controller
      */
     public function update(Request $request, int $id)
     {
-        $retailSale = RetailSale::findOrFail($id);
+        $retailSale = RetailSale::with('items')->findOrFail($id);
 
         $validated = $request->validate([
             'customer_id' => 'nullable|exists:customers,id',
             'shift_id' => 'nullable|exists:shifts,id',
             'sale_date' => 'sometimes|required|date',
+            'items' => 'nullable|array|min:1',
+            'items.*.product_id' => 'required_with:items|exists:products,id',
+            'items.*.quantity' => 'required_with:items|numeric|min:0',
+            'items.*.price' => 'required_with:items|numeric|min:0',
             'discount' => 'nullable|numeric|min:0',
             'tax' => 'nullable|numeric|min:0',
             'payment_method' => 'nullable|string|in:cash,transfer,card',
             'notes' => 'nullable|string',
         ]);
 
-        // Recalculate grand total if discount or tax changed
-        if (isset($validated['discount']) || isset($validated['tax'])) {
-            $totalAmount = $retailSale->total_amount;
-            $discount = $validated['discount'] ?? $retailSale->discount;
-            $tax = $validated['tax'] ?? $retailSale->tax;
-            $validated['grand_total'] = $totalAmount - $discount + $tax;
-        }
+        DB::beginTransaction();
+        try {
+            // Handle Items Update if provided
+            if (isset($validated['items'])) {
+                // 1. Restore inventory for existing items
+                foreach ($retailSale->items as $item) {
+                    $product = Product::find($item->product_id);
+                    if ($product) {
+                        $product->quantity += $item->quantity;
+                        $product->save();
+                    }
+                }
 
-        $retailSale->update($validated);
-        return response()->json($retailSale->load(['customer', 'shift', 'items.product']));
+                // 2. Delete existing items
+                $retailSale->items()->delete();
+
+                // 3. Create new items and deduct inventory
+                $totalAmount = 0;
+                foreach ($validated['items'] as $item) {
+                    RetailSaleItem::create([
+                        'retail_sale_id' => $retailSale->id,
+                        'product_id' => $item['product_id'],
+                        'quantity' => $item['quantity'],
+                        'price' => $item['price'],
+                        'amount' => $item['quantity'] * $item['price'],
+                    ]);
+
+                    $totalAmount += $item['quantity'] * $item['price'];
+
+                    // Update product quantity
+                    $product = Product::find($item['product_id']);
+                    if ($product) {
+                        $product->quantity -= $item['quantity'];
+                        $product->save();
+                    }
+                }
+
+                // Update totals in validated data
+                $validated['total_amount'] = $totalAmount;
+                $discount = $validated['discount'] ?? $retailSale->discount;
+                $tax = $validated['tax'] ?? $retailSale->tax;
+                $validated['grand_total'] = $totalAmount - $discount + $tax;
+            } else {
+                // If items not changing but discount/tax are
+                if (isset($validated['discount']) || isset($validated['tax'])) {
+                    $totalAmount = $retailSale->total_amount;
+                    $discount = $validated['discount'] ?? $retailSale->discount;
+                    $tax = $validated['tax'] ?? $retailSale->tax;
+                    $validated['grand_total'] = $totalAmount - $discount + $tax;
+                }
+            }
+
+            $retailSale->update($validated);
+            
+            DB::commit();
+            return response()->json($retailSale->load(['customer', 'shift', 'items.product']));
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json(['message' => 'Error updating retail sale: ' . $e->getMessage()], 500);
+        }
     }
 
     /**
@@ -181,5 +236,6 @@ class RetailSaleController extends Controller
         }
     }
 }
+
 
 

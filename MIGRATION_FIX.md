@@ -110,3 +110,4 @@ All migrations should show as "Ran" with a checkmark.
 - The `products` table must exist before tables that reference it (tanks, sales, etc.)
 
 
+

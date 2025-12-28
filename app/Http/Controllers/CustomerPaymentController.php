@@ -39,7 +39,7 @@ class CustomerPaymentController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'customer_id' => 'required|exists:customers,id',
+            'customer_id' => 'nullable|exists:customers,id',
             'payment_date' => 'required|date',
             'amount' => 'required|numeric|min:0',
             'payment_method' => 'required|string',
@@ -66,7 +66,7 @@ class CustomerPaymentController extends Controller
             // Based on frontend logic, we are calling API inside a loop, so single store is fine.
 
             $payment = CustomerPayment::create([
-                'customer_id' => $validated['customer_id'],
+                'customer_id' => $validated['customer_id'] ?? null,
                 'payment_id' => $validated['payment_id'] ?? null,
                 'invoice_number' => $validated['invoice_number'] ?? null,
                 'payment_date' => $validated['payment_date'],
@@ -80,14 +80,16 @@ class CustomerPaymentController extends Controller
                 'status' => 'pending'
             ]);
 
-            // Update customer credit balance?
+            // Update customer credit balance if customer exists
             // Usually payment reduces debt (credit balance).
             // Depends on business logic: if credit_balance is amount owed, payment decreases it.
-            $customer = Customer::find($validated['customer_id']);
-            if ($customer) {
-                // Assuming credit_balance is "Amount Owed by Customer"
-                $customer->credit_balance = $customer->credit_balance - $validated['amount']; 
-                $customer->save();
+            if (!empty($validated['customer_id'])) {
+                $customer = Customer::find($validated['customer_id']);
+                if ($customer) {
+                    // Assuming credit_balance is "Amount Owed by Customer"
+                    $customer->credit_balance = $customer->credit_balance - $validated['amount']; 
+                    $customer->save();
+                }
             }
 
             DB::commit();
@@ -117,7 +119,7 @@ class CustomerPaymentController extends Controller
         DB::beginTransaction();
         try {
             // If amount changed, update customer credit balance
-            if ($payment->amount != $validated['amount']) {
+            if ($payment->amount != $validated['amount'] && $payment->customer_id) {
                 $customer = Customer::find($payment->customer_id);
                 if ($customer) {
                     // Revert old amount and apply new amount
@@ -162,11 +164,13 @@ class CustomerPaymentController extends Controller
     {
         $payment = CustomerPayment::findOrFail($id);
         
-        // Revert balance change
-        $customer = Customer::find($payment->customer_id);
-        if ($customer) {
-            $customer->credit_balance = $customer->credit_balance + $payment->amount;
-            $customer->save();
+        // Revert balance change if customer exists
+        if ($payment->customer_id) {
+            $customer = Customer::find($payment->customer_id);
+            if ($customer) {
+                $customer->credit_balance = $customer->credit_balance + $payment->amount;
+                $customer->save();
+            }
         }
 
         if ($payment->attachment_path) {

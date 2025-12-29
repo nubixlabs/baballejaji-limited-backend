@@ -22,11 +22,9 @@ jobs:
             export GIT_TERMINAL_PROMPT=0
 
             PROJECT_DIR="${{ secrets.PROJECT_PATH }}"
-            SSH_USER="${{ secrets.VPS_USER }}"
             PAT_SECRET="${{ secrets.REPO_PAT }}"
 
             echo "➡️ Switching to project directory"
-            sudo chown -R "$SSH_USER":"$SSH_USER" "$PROJECT_DIR"
             cd "$PROJECT_DIR"
 
             echo "➡️ Mark repo as safe"
@@ -44,13 +42,29 @@ jobs:
             echo "➡️ Running database migrations"
             php artisan migrate --force
 
-            echo "➡️ Clearing and caching config/routes/views"
-            php artisan config:cache
-            php artisan route:cache
-            php artisan view:cache
+            echo "➡️ Clearing Laravel caches (safe mode)"
+            php artisan optimize:clear || true
 
-            echo "➡️ Setting storage permissions"
-            chmod -R 775 storage bootstrap/cache
+            echo "➡️ Fixing Laravel permissions (CRITICAL)"
+            # Remove immutable flags (some VPS panels enable this)
+            sudo chattr -R -i storage bootstrap/cache || true
+
+            # Set correct ownership for PHP-FPM / Nginx user
+            sudo chown -R www:www storage bootstrap/cache
+
+            # Directories: rwx for owner & group
+            sudo find storage bootstrap/cache -type d -exec chmod 775 {} \;
+
+            # Files: rw for owner & group
+            sudo find storage bootstrap/cache -type f -exec chmod 664 {} \;
+
+            # Ensure required directories exist
+            mkdir -p storage/logs storage/framework/cache/data
+
+            # Ensure Laravel log file exists and is writable
+            sudo touch storage/logs/laravel.log
+            sudo chown www:www storage/logs/laravel.log
+            sudo chmod 664 storage/logs/laravel.log
 
             echo "➡️ Restarting queue workers"
             php artisan queue:restart || true

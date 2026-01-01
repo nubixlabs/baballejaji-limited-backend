@@ -38,6 +38,30 @@ class DashboardController extends Controller
             'recent_orders' => $recentOrders,
         ]);
     }
+
+    /**
+     * @OA\Get(
+     *   path="/api/super-admin/dashboard/stats",
+     *   summary="Get super admin dashboard statistics",
+     *   tags={"Super Admin"},
+     *   security={{"bearerAuth":{}}},
+     *   @OA\Response(response=200, description="Stats data")
+     * )
+     */
+    public function superAdminStats()
+    {
+        $totalUsers = \App\Models\User::count();
+        $totalStations = \App\Models\FillingStation::count();
+        $totalTransportUnits = \App\Models\Asset::count(); 
+        $totalSpareParts = Part::count();
+
+        return response()->json([
+            'users' => $totalUsers,
+            'filling_stations' => $totalStations,
+            'transport_units' => $totalTransportUnits,
+            'spare_parts' => $totalSpareParts,
+        ]);
+    }
 }
 
 

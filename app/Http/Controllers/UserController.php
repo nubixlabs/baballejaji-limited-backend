@@ -47,7 +47,11 @@ class UserController extends Controller
                     'last_login' => $user->last_login_at?->format('Y-m-d H:i:s'),
                     'group' => $user->userGroup?->name,
                     'group_id' => $user->user_group_id,
-                    'role' => $user->role?->name,
+                    'role' => $user->role ? [
+                        'id' => $user->role->id,
+                        'name' => $user->role->name,
+                        'display_name' => $user->role->display_name ?? $user->role->name,
+                    ] : null,
                     'is_active' => $user->is_active,
                     'created_at' => $user->created_at->format('Y-m-d H:i:s'),
                 ];

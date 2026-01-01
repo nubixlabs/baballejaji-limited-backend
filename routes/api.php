@@ -56,14 +56,18 @@ Route::get('/auth/me', [AuthController::class, 'me'])->middleware('auth:sanctum'
 Route::post('/auth/logout', [AuthController::class, 'logout'])->middleware('auth:sanctum');
 Route::get('/test-debug', [BulkSaleController::class, 'undistributed']);
 
+use App\Http\Controllers\RoleController;
+
 // Super Admin Routes
 Route::middleware('auth:sanctum')->group(function () {
+    Route::get('/roles', [RoleController::class, 'index']);
     Route::prefix('super-admin')->group(function () {
         Route::get('/filling-stations', [FillingStationController::class, 'index']);
         Route::get('/filling-stations/{id}', [FillingStationController::class, 'show']);
         Route::post('/filling-stations', [FillingStationController::class, 'store']);
         Route::put('/filling-stations/{id}', [FillingStationController::class, 'update']);
         Route::delete('/filling-stations/{id}', [FillingStationController::class, 'destroy']);
+        Route::get('/dashboard/stats', [DashboardController::class, 'superAdminStats']);
     });
 });
 

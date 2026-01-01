@@ -54,11 +54,23 @@ class UserGroupSeeder extends Seeder
                     'View tanks', 'View dippings', 'Add/Edit dipping',
                     'View shifts', 'Attendants'
                 ],
+            ],
+            [
+                'name' => 'Spare Parts Managers',
+                'description' => 'Managers for spare parts and inventory',
+                'permissions' => [
+                    'View parts', 'Add part', 'Edit part', 'Delete part',
+                    'View suppliers', 'Add supplier', 'Edit supplier',
+                    'View orders', 'Create order', 'Edit order'
+                ],
             ]
         ];
 
         foreach ($userGroups as $group) {
-            UserGroup::create($group);
+            UserGroup::firstOrCreate(
+                ['name' => $group['name']],
+                $group
+            );
         }
     }
 }

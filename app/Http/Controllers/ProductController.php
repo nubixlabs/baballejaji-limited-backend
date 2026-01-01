@@ -29,6 +29,17 @@ class ProductController extends Controller
             });
         }
 
+        if ($request->has('category')) {
+            $query->where('category', $request->category);
+        }
+
+        if ($request->has('exclude_category')) {
+            $query->where(function($q) use ($request) {
+                $q->where('category', '!=', $request->exclude_category)
+                  ->orWhereNull('category');
+            });
+        }
+
         $products = $query->orderBy('code')->get();
         return response()->json($products);
     }
@@ -87,6 +98,9 @@ class ProductController extends Controller
             'bulk_price' => 'nullable|numeric|min:0',
             're_order_level' => 'nullable|numeric|min:0',
             'iot_product' => 'nullable|string|max:255',
+            'based_on' => 'nullable|string|max:255',
+            'based_on_rate' => 'nullable|numeric|min:0',
+            'category' => 'nullable|string|max:255',
         ]);
 
         $validated['created_by'] = $request->user()->id;
@@ -135,6 +149,9 @@ class ProductController extends Controller
             'bulk_price' => 'nullable|numeric|min:0',
             're_order_level' => 'nullable|numeric|min:0',
             'iot_product' => 'nullable|string|max:255',
+            'based_on' => 'nullable|string|max:255',
+            'based_on_rate' => 'nullable|numeric|min:0',
+            'category' => 'nullable|string|max:255',
         ]);
 
         $validated['last_modified_by'] = $request->user()->id;
@@ -166,9 +183,15 @@ class ProductController extends Controller
      */
     public function inventory(Request $request)
     {
-        $products = Product::with(['priceAdjustments' => function($query) {
+        $query = Product::with(['priceAdjustments' => function($query) {
             $query->latest()->take(1);
-        }])->get();
+        }]);
+
+        if ($request->has('category')) {
+            $query->where('category', $request->category);
+        }
+
+        $products = $query->get();
 
         $inventory = $products->map(function($product) {
             // Calculate purchased, received, dispensed, bulk sales quantities

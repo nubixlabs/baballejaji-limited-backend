@@ -8,9 +8,10 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class TankDipping extends Model
 {
-    use HasFactory;
+    use HasFactory, \App\Traits\BelongsToFillingStation;
 
     protected $fillable = [
+        'filling_station_id',
         'tank_id',
         'dipped_quantity',
         'atg_quantity',

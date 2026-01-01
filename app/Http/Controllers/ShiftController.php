@@ -110,7 +110,7 @@ class ShiftController extends Controller
             }
         }
 
-        // Get the last shift record
+        // Get the last shift record for this station (automatically scoped by trait if header exists)
         $lastShift = Shift::orderBy('id', 'desc')->first();
 
         // Generate next shift id

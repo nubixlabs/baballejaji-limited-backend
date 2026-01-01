@@ -8,9 +8,10 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Shift extends Model
 {
-    use HasFactory;
+    use HasFactory, \App\Traits\BelongsToFillingStation;
 
     protected $fillable = [
+        'filling_station_id',
         'shift_id',
         'name',
         'date',

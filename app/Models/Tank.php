@@ -9,9 +9,10 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Tank extends Model
 {
-    use HasFactory;
+    use HasFactory, \App\Traits\BelongsToFillingStation;
 
     protected $fillable = [
+        'filling_station_id',
         'name',
         'product_id',
         'capacity',

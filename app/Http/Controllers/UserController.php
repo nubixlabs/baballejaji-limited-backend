@@ -69,6 +69,8 @@ class UserController extends Controller
             'user_group_id' => 'nullable|exists:user_groups,id',
             'role_id' => 'required|exists:roles,id',
             'is_active' => 'boolean',
+            'filling_station_ids' => 'nullable|array',
+            'filling_station_ids.*' => 'exists:filling_stations,id',
         ]);
 
         $validated['password'] = Hash::make($validated['password']);
@@ -79,6 +81,10 @@ class UserController extends Controller
         // Log activity
         if (auth()->user()) {
             auth()->user()->logActivity('user_created', "Created user: {$user->name}");
+        }
+
+        if ($request->has('filling_station_ids')) {
+            $user->fillingStations()->sync($request->filling_station_ids);
         }
 
         return response()->json([
@@ -113,6 +119,8 @@ class UserController extends Controller
             'user_group_id' => 'nullable|exists:user_groups,id',
             'role_id' => 'required|exists:roles,id',
             'is_active' => 'boolean',
+            'filling_station_ids' => 'nullable|array',
+            'filling_station_ids.*' => 'exists:filling_stations,id',
         ]);
 
         if (isset($validated['password'])) {
@@ -126,6 +134,10 @@ class UserController extends Controller
         // Log activity
         if (auth()->user()) {
             auth()->user()->logActivity('user_updated', "Updated user: {$user->name}");
+        }
+
+        if ($request->has('filling_station_ids')) {
+            $user->fillingStations()->sync($request->filling_station_ids);
         }
 
         return response()->json([

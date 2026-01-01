@@ -8,9 +8,10 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class PriceAdjustment extends Model
 {
-    use HasFactory;
+    use HasFactory, \App\Traits\BelongsToFillingStation;
 
     protected $fillable = [
+        'filling_station_id',
         'product_id',
         'old_cost_price',
         'new_cost_price',

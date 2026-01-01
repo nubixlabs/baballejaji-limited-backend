@@ -8,9 +8,10 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class DailySale extends Model
 {
-    use HasFactory;
+    use HasFactory, \App\Traits\BelongsToFillingStation;
 
     protected $fillable = [
+        'filling_station_id',
         'shift_id',
         'product_id',
         'quantity',

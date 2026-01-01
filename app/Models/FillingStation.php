@@ -40,4 +40,8 @@ class FillingStation extends Model
     {
         return $this->belongsTo(User::class, 'updated_by');
     }
+    public function users(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
+    {
+        return $this->belongsToMany(User::class);
+    }
 }

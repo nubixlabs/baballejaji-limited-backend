@@ -154,4 +154,11 @@ class User extends Authenticatable
             'last_login_user_agent' => request()->userAgent(),
         ]);
     }
+    /**
+     * The filling stations that belong to the user.
+     */
+    public function fillingStations(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
+    {
+        return $this->belongsToMany(FillingStation::class);
+    }
 }

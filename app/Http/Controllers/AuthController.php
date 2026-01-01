@@ -84,7 +84,7 @@ class AuthController extends Controller
             'password' => 'required',
         ]);
 
-        $user = User::where('email', $request->email)->with('role')->first();
+        $user = User::where('email', $request->email)->with(['role', 'fillingStations'])->first();
 
         if (!$user || !Hash::check($request->password, $user->password)) {
             throw ValidationException::withMessages([
@@ -106,6 +106,7 @@ class AuthController extends Controller
                     'name' => $user->role->name,
                     'display_name' => $user->role->display_name,
                 ] : null,
+                'filling_stations' => $user->fillingStations,
             ],
             'accessToken' => $accessToken,
             'refreshToken' => $refreshToken,
@@ -125,7 +126,7 @@ class AuthController extends Controller
             return response()->json(['error' => 'Unauthorized'], 401);
         }
 
-        $user->load('role');
+        $user->load(['role', 'fillingStations']);
 
         return response()->json([
             'user' => [
@@ -137,6 +138,7 @@ class AuthController extends Controller
                     'name' => $user->role->name,
                     'display_name' => $user->role->display_name,
                 ] : null,
+                'filling_stations' => $user->fillingStations,
             ],
         ]);
     }

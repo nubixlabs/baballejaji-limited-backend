@@ -36,32 +36,34 @@ jobs:
             echo "➡️ Pulling latest code"
             git -c http.extraheader="AUTHORIZATION: basic $(printf '%s' "nubixlabs:$PAT_SECRET" | base64)" pull origin main
 
+            echo "➡️ PRE-DEPLOY: Preparing directories and permissions"
+            # Ensure all required Laravel directories exist before composer touches them
+            mkdir -p storage/logs storage/framework/cache/data storage/framework/sessions storage/framework/views bootstrap/cache
+            
+            # Remove immutable flags (if your VPS uses them)
+            sudo chattr -R -i storage bootstrap/cache || true
+
+            # Grant the current SSH user and the web group ownership
+            # Note: Change 'www' to 'www-data' if you are on a standard Ubuntu/Nginx setup
+            sudo chown -R $USER:www storage bootstrap/cache
+            sudo chmod -R 775 storage bootstrap/cache
+
             echo "➡️ Installing composer dependencies"
+            # This will now succeed because bootstrap/cache is writable
             composer install --no-interaction --prefer-dist --optimize-autoloader
 
             echo "➡️ Running database migrations"
             php artisan migrate --force
 
-            echo "➡️ Clearing Laravel caches (safe mode)"
+            echo "➡️ Clearing Laravel caches"
             php artisan optimize:clear || true
 
-            echo "➡️ Fixing Laravel permissions (CRITICAL)"
-            # Remove immutable flags (some VPS panels enable this)
-            sudo chattr -R -i storage bootstrap/cache || true
-
-            # Set correct ownership for PHP-FPM / Nginx user
+            echo "➡️ POST-DEPLOY: Finalizing permissions"
+            # Ensure the web server user (www) owns the storage for runtime writing
             sudo chown -R www:www storage bootstrap/cache
-
-            # Directories: rwx for owner & group
-            sudo find storage bootstrap/cache -type d -exec chmod 775 {} \;
-
-            # Files: rw for owner & group
-            sudo find storage bootstrap/cache -type f -exec chmod 664 {} \;
-
-            # Ensure required directories exist
-            mkdir -p storage/logs storage/framework/cache/data
-
-            # Ensure Laravel log file exists and is writable
+            sudo chmod -R 775 storage bootstrap/cache
+            
+            # Ensure log file is specifically writable
             sudo touch storage/logs/laravel.log
             sudo chown www:www storage/logs/laravel.log
             sudo chmod 664 storage/logs/laravel.log

@@ -68,6 +68,13 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::put('/filling-stations/{id}', [FillingStationController::class, 'update']);
         Route::delete('/filling-stations/{id}', [FillingStationController::class, 'destroy']);
         Route::get('/dashboard/stats', [DashboardController::class, 'superAdminStats']);
+        
+        // Super Admin - Products Management
+        Route::get('/products', [ProductController::class, 'index']);
+        Route::get('/products/{id}', [ProductController::class, 'show']);
+        Route::post('/products', [ProductController::class, 'store']);
+        Route::put('/products/{id}', [ProductController::class, 'update']);
+        Route::delete('/products/{id}', [ProductController::class, 'destroy']);
     });
 });
 

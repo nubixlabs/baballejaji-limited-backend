@@ -12,6 +12,10 @@ console_command = 'php /var/www/html/artisan tinker'
     NODE_VERSION = '20'
     PHP_VERSION = '8.2'
 
+[[mounts]]
+  source = "data"
+  destination = "/data"
+
 [env]
   APP_ENV = 'production'
   LOG_CHANNEL = 'stderr'

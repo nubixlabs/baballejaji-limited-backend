@@ -12,6 +12,12 @@ chown www-data:www-data "$DB_PATH" 2>/dev/null || true
 # Run pending migrations
 /usr/bin/php /var/www/html/artisan migrate --force --no-ansi -q 2>/dev/null || true
 
+# Seed database if users table is empty (idempotent)
+USER_COUNT=$(/usr/bin/php /var/www/html/artisan tinker --execute="echo App\Models\User::count();" 2>/dev/null || echo "0")
+if [ "$USER_COUNT" = "0" ]; then
+  /usr/bin/php /var/www/html/artisan db:seed --force --no-ansi -q 2>/dev/null || true
+fi
+
 # Cache config, routes, views
 /usr/bin/php /var/www/html/artisan config:cache --no-ansi -q
 /usr/bin/php /var/www/html/artisan route:cache --no-ansi -q

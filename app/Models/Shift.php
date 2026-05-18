@@ -23,10 +23,15 @@ class Shift extends Model
         'status',
         'closed_at',
         'approved_at',
+        'opened_by',
         'closed_by',
         'approved_by',
         'nozzle_readings',
         'credit_sales_data',
+        'cashbacks_data',
+        'expenses_data',
+        'nozzle_reading_name',
+        'additional_readings',
     ];
 
     protected $casts = [
@@ -39,6 +44,10 @@ class Shift extends Model
         'approved_at' => 'datetime',
         'nozzle_readings' => 'array',
         'credit_sales_data' => 'array',
+        'cashbacks_data' => 'array',
+        'expenses_data' => 'array',
+        'nozzle_reading_name' => 'string',
+        'additional_readings' => 'array',
     ];
 
     public function stockLevels(): HasMany
@@ -59,6 +68,21 @@ class Shift extends Model
     public function bulkSales(): HasMany
     {
         return $this->hasMany(BulkSale::class);
+    }
+
+    public function closedByUser()
+    {
+        return $this->belongsTo(\App\Models\User::class, 'closed_by');
+    }
+
+    public function approvedByUser()
+    {
+        return $this->belongsTo(\App\Models\User::class, 'approved_by');
+    }
+
+    public function openedByUser()
+    {
+        return $this->belongsTo(\App\Models\User::class, 'opened_by');
     }
 }
 

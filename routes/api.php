@@ -61,6 +61,9 @@ use App\Http\Controllers\RoleController;
 // Super Admin Routes
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('/roles', [RoleController::class, 'index']);
+    Route::post('/roles', [RoleController::class, 'store']);
+    Route::put('/roles/{id}', [RoleController::class, 'update']);
+    Route::delete('/roles/{id}', [RoleController::class, 'destroy']);
     Route::prefix('super-admin')->group(function () {
         Route::get('/filling-stations', [FillingStationController::class, 'index']);
         Route::get('/filling-stations/{id}', [FillingStationController::class, 'show']);
@@ -122,6 +125,7 @@ Route::middleware('auth:sanctum')->group(function () {
         // Filling Station - Customers
         Route::get('/customers', [CustomerController::class, 'index']);
         Route::get('/customers/credit-limit/report', [CustomerController::class, 'creditLimitReport']);
+        Route::get('/customers/{id}/ledger', [CustomerController::class, 'ledger']);
         Route::get('/customers/{id}', [CustomerController::class, 'show']);
         Route::post('/customers', [CustomerController::class, 'store']);
         Route::put('/customers/{id}', [CustomerController::class, 'update']);
@@ -139,6 +143,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::delete('/shifts/{id}/delete-values', [ShiftController::class, 'deleteValues']);
         Route::post('/shifts/{id}/cancel', [ShiftController::class, 'cancel']);
         Route::post('/shifts/{id}/reopen', [ShiftController::class, 'reopen']);
+        Route::post('/shifts/recalculate-sales', [ShiftController::class, 'recalculateSales']);
 
         // Filling Station - Stock Levels
         Route::get('/stock-levels', [StockLevelController::class, 'index']);

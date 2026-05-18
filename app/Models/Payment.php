@@ -43,6 +43,14 @@ class Payment extends Model
     }
 
     /**
+     * Get the shift associated with the payment.
+     */
+    public function shift(): BelongsTo
+    {
+        return $this->belongsTo(Shift::class, 'shift_id', 'id');
+    }
+
+    /**
      * Get the purchase that this payment is for.
      */
     public function purchase(): BelongsTo

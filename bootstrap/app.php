@@ -12,7 +12,9 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        $middleware->use([\Illuminate\Http\Middleware\HandleCors::class]);
+        $middleware->use([
+            \Illuminate\Http\Middleware\HandleCors::class,
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->render(function (Throwable $e, $request) {
@@ -25,6 +27,11 @@ return Application::configure(basePath: dirname(__DIR__))
                     return response()->json([
                         'message' => 'Validation failed',
                         'errors' => $e->errors(),
+                    ], $status);
+                } elseif ($e instanceof Illuminate\Auth\AuthenticationException) {
+                    $status = 401;
+                    return response()->json([
+                        'message' => 'Unauthenticated',
                     ], $status);
                 }
 

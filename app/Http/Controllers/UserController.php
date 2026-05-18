@@ -16,9 +16,8 @@ class UserController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-        $query = User::with(['role', 'userGroup']);
+        $query = User::with(['role', 'userGroup', 'fillingStation']);
 
-        // Apply filters
         if ($request->filled('group')) {
             $query->where('user_group_id', $request->group);
         }
@@ -45,8 +44,17 @@ class UserController extends Controller
                     'phone' => $user->phone,
                     'username' => $user->username,
                     'last_login' => $user->last_login_at?->format('Y-m-d H:i:s'),
-                    'group' => $user->userGroup?->name,
+                    'user_group' => $user->userGroup ? [
+                        'id' => $user->userGroup->id,
+                        'name' => $user->userGroup->name,
+                    ] : null,
                     'group_id' => $user->user_group_id,
+                    'filling_station' => $user->fillingStation ? [
+                        'id' => $user->fillingStation->id,
+                        'name' => $user->fillingStation->name,
+                        'code' => $user->fillingStation->code,
+                    ] : null,
+                    'filling_station_id' => $user->filling_station_id,
                     'role' => $user->role ? [
                         'id' => $user->role->id,
                         'name' => $user->role->name,
@@ -70,11 +78,12 @@ class UserController extends Controller
             'phone' => 'nullable|string|max:20',
             'username' => 'required|string|max:255|unique:users',
             'password' => 'required|string|min:8',
-            'user_group_id' => 'nullable|exists:user_groups,id',
-            'role_id' => 'required|exists:roles,id',
-            'is_active' => 'boolean',
+            'user_group_id' => 'nullable|string',
+            'filling_station_id' => 'nullable|exists:filling_stations,id',
             'filling_station_ids' => 'nullable|array',
             'filling_station_ids.*' => 'exists:filling_stations,id',
+            'role_id' => 'required|exists:roles,id',
+            'is_active' => 'boolean',
         ]);
 
         $validated['password'] = Hash::make($validated['password']);
@@ -82,19 +91,20 @@ class UserController extends Controller
 
         $user = User::create($validated);
 
-        // Log activity
-        if (auth()->user()) {
-            auth()->user()->logActivity('user_created', "Created user: {$user->name}");
+        // Sync filling station assignments
+        if ($request->has('filling_station_ids') && is_array($request->filling_station_ids)) {
+            $stationIds = array_map('intval', $request->filling_station_ids);
+            $user->fillingStations()->sync($stationIds);
         }
 
-        if ($request->has('filling_station_ids')) {
-            $user->fillingStations()->sync($request->filling_station_ids);
+        if (auth()->user()) {
+            auth()->user()->logActivity('user_created', "Created user: {$user->name}");
         }
 
         return response()->json([
             'success' => true,
             'message' => 'User created successfully',
-            'data' => $user->load(['role', 'userGroup'])
+            'data' => $user->load(['role', 'userGroup', 'fillingStation', 'fillingStations'])
         ], 201);
     }
 
@@ -105,49 +115,51 @@ class UserController extends Controller
     {
         return response()->json([
             'success' => true,
-            'data' => $user->load(['role', 'userGroup'])
+            'data' => $user->load(['role', 'userGroup', 'fillingStation', 'fillingStations'])
         ]);
     }
 
     /**
-     * Update the specified user.
+     * Update a user.
      */
     public function update(Request $request, User $user): JsonResponse
     {
         $validated = $request->validate([
-            'name' => 'required|string|max:255',
-            'email' => ['required', 'string', 'email', 'max:255', Rule::unique('users')->ignore($user->id)],
+            'name' => 'sometimes|required|string|max:255',
+            'email' => ['sometimes', 'required', 'string', 'email', 'max:255', Rule::unique('users')->ignore($user->id)],
             'phone' => 'nullable|string|max:20',
-            'username' => ['required', 'string', 'max:255', Rule::unique('users')->ignore($user->id)],
+            'username' => ['sometimes', 'required', 'string', 'max:255', Rule::unique('users')->ignore($user->id)],
             'password' => 'nullable|string|min:8',
-            'user_group_id' => 'nullable|exists:user_groups,id',
-            'role_id' => 'required|exists:roles,id',
-            'is_active' => 'boolean',
+            'user_group_id' => 'nullable|string',
+            'filling_station_id' => 'nullable|exists:filling_stations,id',
             'filling_station_ids' => 'nullable|array',
             'filling_station_ids.*' => 'exists:filling_stations,id',
+            'role_id' => 'sometimes|required|exists:roles,id',
+            'is_active' => 'boolean',
         ]);
 
         if (isset($validated['password'])) {
             $validated['password'] = Hash::make($validated['password']);
-        } else {
-            unset($validated['password']);
         }
 
         $user->update($validated);
 
-        // Log activity
-        if (auth()->user()) {
-            auth()->user()->logActivity('user_updated', "Updated user: {$user->name}");
+        // Sync filling station assignments
+        if ($request->has('filling_station_ids') && is_array($request->filling_station_ids)) {
+            $stationIds = array_map('intval', $request->filling_station_ids);
+            $user->fillingStations()->sync($stationIds);
+        } elseif ($request->has('filling_station_ids')) {
+            $user->fillingStations()->sync([]);
         }
 
-        if ($request->has('filling_station_ids')) {
-            $user->fillingStations()->sync($request->filling_station_ids);
+        if (auth()->user()) {
+            auth()->user()->logActivity('user_updated', "Updated user: {$user->name}");
         }
 
         return response()->json([
             'success' => true,
             'message' => 'User updated successfully',
-            'data' => $user->load(['role', 'userGroup'])
+            'data' => $user->load(['role', 'userGroup', 'fillingStation'])
         ]);
     }
 
@@ -159,7 +171,6 @@ class UserController extends Controller
         $userName = $user->name;
         $user->delete();
 
-        // Log activity
         if (auth()->user()) {
             auth()->user()->logActivity('user_deleted', "Deleted user: {$userName}");
         }
@@ -179,7 +190,6 @@ class UserController extends Controller
 
         $status = $user->is_active ? 'activated' : 'deactivated';
         
-        // Log activity
         if (auth()->user()) {
             auth()->user()->logActivity('user_status_changed', "User {$user->name} {$status}");
         }

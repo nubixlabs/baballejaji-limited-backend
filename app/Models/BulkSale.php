@@ -35,6 +35,11 @@ class BulkSale extends Model
         'grand_total' => 'decimal:2',
     ];
 
+    public function shift(): BelongsTo
+    {
+        return $this->belongsTo(Shift::class);
+    }
+
     public function customer(): BelongsTo
     {
         return $this->belongsTo(Customer::class);

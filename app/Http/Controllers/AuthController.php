@@ -106,6 +106,10 @@ class AuthController extends Controller
                     'name' => $user->role->name,
                     'display_name' => $user->role->display_name,
                 ] : null,
+                'user_group' => $user->userGroup ? [
+                    'id' => $user->userGroup->id,
+                    'name' => $user->userGroup->name,
+                ] : null,
                 'filling_stations' => $user->fillingStations,
             ],
             'accessToken' => $accessToken,
@@ -137,6 +141,10 @@ class AuthController extends Controller
                     'id' => $user->role->id,
                     'name' => $user->role->name,
                     'display_name' => $user->role->display_name,
+                ] : null,
+                'user_group' => $user->userGroup ? [
+                    'id' => $user->userGroup->id,
+                    'name' => $user->userGroup->name,
                 ] : null,
                 'filling_stations' => $user->fillingStations,
             ],

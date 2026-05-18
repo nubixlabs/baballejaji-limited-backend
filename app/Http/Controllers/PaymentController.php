@@ -17,7 +17,7 @@ class PaymentController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-        $query = Payment::with(['supplier', 'purchase', 'creator']);
+        $query = Payment::with(['supplier', 'purchase', 'creator', 'shift']);
 
         // Apply filters
         if ($request->filled('supplier_id')) {
@@ -68,7 +68,7 @@ class PaymentController extends Controller
                     'payment_method' => $payment->payment_method,
                     'reference_number' => $payment->reference_number,
                     'shift_id' => $payment->shift_id,
-                    'sales_revenue' => $payment->sales_revenue,
+                    'sales_revenue' => $payment->sales_revenue ?? $payment->shift?->sales_revenue ?? 0,
                     'paid_by' => $payment->paid_by,
                     'received_by' => $payment->received_by,
                     'details' => $payment->details,
@@ -90,7 +90,7 @@ class PaymentController extends Controller
             'supplier_id' => 'required|exists:suppliers,id',
             'purchase_id' => 'nullable|exists:purchases,id',
             'amount' => 'required|numeric|min:0.01',
-            'payment_method' => 'required|in:cash,bank_transfer,cheque,mobile_money,other',
+            'payment_method' => 'required|in:cash,bank_transfer,pos_transfer,expenses,credit_sale,other',
             'reference_number' => 'nullable|string|max:255',
             'shift_id' => 'nullable|string|max:50',
             'sales_revenue' => 'nullable|numeric|min:0',
@@ -156,9 +156,16 @@ class PaymentController extends Controller
      */
     public function show(Payment $payment): JsonResponse
     {
+        $payment->load(['supplier', 'purchase', 'creator', 'shift']);
+
+        // Fallback to shift's sales_revenue if payment's is null
+        if (is_null($payment->sales_revenue) && $payment->shift) {
+            $payment->sales_revenue = $payment->shift->sales_revenue;
+        }
+
         return response()->json([
             'success' => true,
-            'data' => $payment->load(['supplier', 'purchase', 'creator'])
+            'data' => $payment
         ]);
     }
 
@@ -179,7 +186,7 @@ class PaymentController extends Controller
             'supplier_id' => 'required|exists:suppliers,id',
             'purchase_id' => 'nullable|exists:purchases,id',
             'amount' => 'required|numeric|min:0.01',
-            'payment_method' => 'required|in:cash,bank_transfer,cheque,mobile_money,other',
+            'payment_method' => 'required|in:cash,bank_transfer,pos_transfer,expenses,credit_sale,other',
             'reference_number' => 'nullable|string|max:255',
             'shift_id' => 'nullable|string|max:50',
             'sales_revenue' => 'nullable|numeric|min:0',

@@ -19,6 +19,8 @@ class NozzleController extends Controller
             $query->where('tank_id', $request->tank_id);
         }
 
+        // Scoped to filling station via BelongsToFillingStation trait global scope (X-Filling-Station-Id header)
+
         $nozzles = $query->orderBy('name')->get();
         return response()->json($nozzles);
     }
@@ -31,6 +33,7 @@ class NozzleController extends Controller
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'tank_id' => 'required|exists:tanks,id',
+            'filling_station_id' => 'nullable|integer|exists:filling_stations,id',
             'description' => 'nullable|string',
             'status' => 'nullable|string|in:Active,Inactive',
             'reading' => 'nullable|numeric|min:0',
@@ -39,6 +42,38 @@ class NozzleController extends Controller
             'is_online' => 'nullable|boolean',
         ]);
 
+        // Bypass Tank global scope to read the tank's actual filling_station_id
+        $tank = Tank::withoutGlobalScope('filling_station')->find($validated['tank_id']);
+        $tankStationId = $tank?->filling_station_id;
+
+        // Fallback to header or request body
+        $headerStationId = $request->header('X-Filling-Station-Id');
+        $bodyStationId = $validated['filling_station_id'] ?? null;
+        $fillingStationId = $tankStationId
+            ?? (is_numeric($headerStationId) ? (int) $headerStationId : null)
+            ?? $bodyStationId;
+
+        
+        // Reject 0 or null — it means no valid station was resolved
+        if (!$fillingStationId) {
+            return response()->json([
+                'message' => 'No valid filling station could be determined. Please select a filling station in the top bar and ensure your tank belongs to a station.',
+                'debug' => [
+                    'tank_id' => $validated['tank_id'],
+                    'tank_found' => !!$tank,
+                    'tank_station_id' => $tankStationId,
+                    'header_station_id' => $headerStationId,
+                    'body_station_id' => $bodyStationId,
+                ]
+            ], 422);
+        }
+
+        // Ensure the selected tank belongs to the resolved filling station
+        if ($tank && $tank->filling_station_id != $fillingStationId) {
+            return response()->json(['message' => 'The selected tank does not belong to your filling station.'], 422);
+        }
+
+        $validated['filling_station_id'] = $fillingStationId;
         $validated['created_by'] = $request->user()->id ?? null;
         $validated['last_modified_by'] = $request->user()->id ?? null;
         $validated['modified_at'] = now();

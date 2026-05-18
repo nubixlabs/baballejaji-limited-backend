@@ -219,44 +219,56 @@ class PurchaseController extends Controller
         DB::beginTransaction();
         try {
             $allReceived = true;
-            $totalReceivedDelta = 0;
+            $totalToAdd = 0;
             foreach ($validated['items'] as $itemData) {
                 $purchaseItem = PurchaseItem::where('purchase_id', $id)
                     ->where('id', $itemData['id'])
                     ->firstOrFail();
 
-                $previousReceived = $purchaseItem->received_quantity;
-                $receivedQty = $itemData['received_quantity'];
-                $delta = max(0, $receivedQty - $previousReceived);
-                $totalReceivedDelta += $delta;
+                $addQty = $itemData['received_quantity'];
+                if ($addQty <= 0) continue;
 
-                $purchaseItem->received_quantity = $receivedQty;
-                $purchaseItem->save();
-
-                // Update product quantity if received
-                if ($delta > 0) {
-                    $product = Product::find($purchaseItem->product_id);
-                    if ($product) {
-                        $product->quantity += $delta;
-                        $product->save();
-                    }
+                // Check remaining quantity on purchase
+                $remaining = $purchaseItem->quantity - $purchaseItem->received_quantity;
+                if ($addQty > $remaining) {
+                    DB::rollBack();
+                    return response()->json([
+                        'message' => "Cannot receive more than remaining quantity ({$remaining})."
+                    ], 400);
                 }
 
-                // Check if all items are received
+                $totalToAdd += $addQty;
+
+                $purchaseItem->received_quantity += $addQty;
+                $purchaseItem->save();
+
+                // Update product quantity
+                $product = Product::find($purchaseItem->product_id);
+                if ($product) {
+                    $product->quantity += $addQty;
+                    $product->save();
+                }
+
                 if ($purchaseItem->received_quantity < $purchaseItem->quantity) {
                     $allReceived = false;
                 }
             }
 
             // Update tank content if provided
-            if (!empty($validated['tank_id']) && $totalReceivedDelta > 0) {
+            if (!empty($validated['tank_id']) && $totalToAdd > 0) {
                 $tank = Tank::find($validated['tank_id']);
                 if ($tank) {
-                    $tank->content = ($tank->content ?? 0) + $totalReceivedDelta;
+                    $newContent = ($tank->content ?? 0) + $totalToAdd;
+                    if ($newContent > $tank->capacity) {
+                        DB::rollBack();
+                        return response()->json([
+                            'message' => "Cannot receive. Tank capacity exceeded! Tank capacity is {$tank->capacity}, current content is " . ($tank->content ?? 0) . ", trying to add {$totalToAdd}."
+                        ], 400);
+                    }
+                    $tank->content = $newContent;
                     $tank->save();
                 }
 
-                // Persist selected tank on purchase
                 $purchase->tank_id = $validated['tank_id'];
             }
 

@@ -28,6 +28,7 @@ class User extends Authenticatable
         'password',
         'role_id',
         'user_group_id',
+        'filling_station_id',
         'last_login_at',
         'last_login_ip',
         'last_login_user_agent',
@@ -105,6 +106,14 @@ class User extends Authenticatable
     public function userGroup(): BelongsTo
     {
         return $this->belongsTo(UserGroup::class);
+    }
+
+    /**
+     * Get the filling station that belongs to the user.
+     */
+    public function fillingStation(): BelongsTo
+    {
+        return $this->belongsTo(FillingStation::class);
     }
 
     /**

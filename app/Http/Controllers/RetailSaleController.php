@@ -36,7 +36,7 @@ class RetailSaleController extends Controller
             $query->where('sale_date', '<=', $request->date_to);
         }
 
-        $retailSales = $query->orderByDesc('sale_date')->get();
+        $retailSales = $query->orderByDesc('id')->get();
         return response()->json($retailSales);
     }
 
@@ -64,28 +64,27 @@ class RetailSaleController extends Controller
             'items.*.price' => 'required|numeric|min:0',
             'discount' => 'nullable|numeric|min:0',
             'tax' => 'nullable|numeric|min:0',
-            'payment_method' => 'nullable|string|in:cash,transfer,card',
+            'payment_method' => 'nullable|string|in:cash,transfer,card,credit',
             'notes' => 'nullable|string',
         ]);
 
+        // Calculate total from items
+        $totalAmount = 0;
+        $totalQuantity = 0;
+        foreach ($validated['items'] as $item) {
+            $totalAmount += $item['price'] * $item['quantity'];
+            $totalQuantity += $item['quantity'];
+        }
+        $discount = $validated['discount'] ?? 0;
+        $tax = $validated['tax'] ?? 0;
+        $grandTotal = $totalAmount - $discount + $tax;
+
         DB::beginTransaction();
         try {
-            // Generate invoice number
-            $invoiceNumber = 'RETAIL-' . strtoupper(Str::random(10));
-
-            // Calculate totals
-            $totalAmount = 0;
-            foreach ($validated['items'] as $item) {
-                $totalAmount += $item['quantity'] * $item['price'];
-            }
-
-            $discount = $validated['discount'] ?? 0;
-            $tax = $validated['tax'] ?? 0;
-            $grandTotal = $totalAmount - $discount + $tax;
-
-            // Create retail sale
+            $stationId = $request->header('X-Filling-Station-Id') ?? 1;
             $retailSale = RetailSale::create([
-                'invoice_number' => $invoiceNumber,
+                'filling_station_id' => $stationId,
+                'invoice_number' => $validated['invoice_number'] ?? 'INV-' . strtoupper(uniqid()),
                 'customer_id' => $validated['customer_id'] ?? null,
                 'shift_id' => $validated['shift_id'] ?? null,
                 'sale_date' => $validated['sale_date'],
@@ -141,7 +140,7 @@ class RetailSaleController extends Controller
             'items.*.price' => 'required_with:items|numeric|min:0',
             'discount' => 'nullable|numeric|min:0',
             'tax' => 'nullable|numeric|min:0',
-            'payment_method' => 'nullable|string|in:cash,transfer,card',
+            'payment_method' => 'nullable|string|in:cash,transfer,card,credit',
             'notes' => 'nullable|string',
         ]);
 

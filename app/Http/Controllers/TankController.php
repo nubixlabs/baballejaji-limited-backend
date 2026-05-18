@@ -64,8 +64,10 @@ class TankController extends Controller
      */
     public function store(Request $request)
     {
+        $fillingStationId = $request->header('X-Filling-Station-Id');
+
         $validated = $request->validate([
-            'name' => 'required|string|max:255',
+            'name' => 'required|string|max:255|unique:tanks,name,NULL,id,filling_station_id,' . ($fillingStationId ?? 'NULL'),
             'product_id' => 'required|exists:products,id',
             'capacity' => 'required|numeric|min:0',
             'content' => 'nullable|numeric|min:0',
@@ -109,9 +111,10 @@ class TankController extends Controller
     public function update(Request $request, int $id)
     {
         $tank = Tank::findOrFail($id);
+        $fillingStationId = $request->header('X-Filling-Station-Id');
 
         $validated = $request->validate([
-            'name' => 'sometimes|required|string|max:255',
+            'name' => 'sometimes|required|string|max:255|unique:tanks,name,' . $id . ',id,filling_station_id,' . ($fillingStationId ?? 'NULL'),
             'product_id' => 'sometimes|required|exists:products,id',
             'capacity' => 'sometimes|required|numeric|min:0',
             'content' => 'nullable|numeric|min:0',

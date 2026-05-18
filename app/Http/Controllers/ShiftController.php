@@ -62,12 +62,151 @@ class ShiftController extends Controller
      */
     public function show(int $id)
     {
-        $shift = Shift::with(['stockLevels.product', 'dailySales.product', 'bulkSales'])->findOrFail($id);
+        $relations = [
+            'stockLevels.product',
+            'bulkSales',
+            'bulkSales.items.product',
+            'openedByUser',
+            'closedByUser',
+            'approvedByUser'
+        ];
+        if (\Illuminate\Support\Facades\Schema::hasTable('daily_sales')) {
+            $relations[] = 'dailySales.product';
+        }
+        $shift = Shift::with($relations)->findOrFail($id);
         
-        // Calculate revenues
+        // Calculate Bulk Sales Revenue
         $shift->bulk_sales_revenue = $shift->bulkSales
             ->where('payment_status', 'approved')
             ->sum('grand_total');
+
+        // Calculate Retail Sales Revenue from nozzle readings
+        $retailSales = 0;
+        if ($shift->nozzle_readings && is_array($shift->nozzle_readings)) {
+            foreach ($shift->nozzle_readings as $reading) {
+                $qtySold = $reading['qty_sold'] ?? 0;
+                $retailPrice = 0;
+                if (isset($reading['product_name'])) {
+                    $product = \App\Models\Product::where('name', $reading['product_name'])->first();
+                    if ($product) {
+                        $retailPrice = $product->retail_price ?? 0;
+                    }
+                }
+                $retailSales += $qtySold * $retailPrice;
+            }
+        }
+        $shift->retail_sales_revenue = $retailSales;
+
+        // Dealer Sales Revenue (placeholder for now)
+        $shift->dealer_sales_revenue = 0;
+
+        // Shift Revenue = Retail Sales Revenue + Bulk Sales Revenue
+        $cashGiven = 0;
+        $creditSales = 0;
+        if ($shift->nozzle_readings && is_array($shift->nozzle_readings)) {
+            foreach ($shift->nozzle_readings as $reading) {
+                $qtySold = $reading['qty_sold'] ?? 0;
+                $product = null;
+                if (isset($reading['product_name'])) {
+                    $product = \App\Models\Product::where('name', $reading['product_name'])->first();
+                }
+                $price = $product ? ($product->retail_price ?? 0) : 0;
+                $cashGiven += $qtySold * $price;
+            }
+        }
+        // Add credit sales data
+        if ($shift->credit_sales_data && is_array($shift->credit_sales_data)) {
+            foreach ($shift->credit_sales_data as $sale) {
+                $qty = $sale['quantity'] ?? 0;
+                $productId = $sale['product_id'] ?? null;
+                $discount = $sale['discount'] ?? 0;
+                $product = $productId ? \App\Models\Product::find($productId) : null;
+                $price = $product ? ($product->retail_price ?? 0) : 0;
+                $creditSales += ($qty * $price) - $discount;
+            }
+        }
+        $shift->cash_given = $cashGiven;
+        $shift->shift_revenue = $shift->bulk_sales_revenue + $shift->retail_sales_revenue;
+        $shift->total_revenue = $shift->shift_revenue;
+
+        // Calculate margin (Total Revenue - Cost - Expenses)
+        $totalCost = 0;
+        if ($shift->nozzle_readings && is_array($shift->nozzle_readings)) {
+            foreach ($shift->nozzle_readings as $reading) {
+                $qtySold = $reading['qty_sold'] ?? 0;
+                $product = null;
+                if (isset($reading['product_name'])) {
+                    $product = \App\Models\Product::where('name', $reading['product_name'])->first();
+                }
+                $costPrice = $product ? ($product->cost_price ?? 0) : 0;
+                $totalCost += $qtySold * $costPrice;
+            }
+        }
+
+        // Calculate total expenses
+        $totalExpenses = 0;
+        if ($shift->expenses_data && is_array($shift->expenses_data)) {
+            foreach ($shift->expenses_data as $expense) {
+                $totalExpenses += $expense['amount'] ?? 0;
+            }
+        }
+        $shift->total_expenses = $totalExpenses;
+
+        $shift->margin = $shift->total_revenue - $totalCost - $totalExpenses;
+
+        // Cashback given
+        $cashbackGiven = 0;
+        if ($shift->cashbacks_data && is_array($shift->cashbacks_data)) {
+            foreach ($shift->cashbacks_data as $cb) {
+                $cashbackGiven += $cb['amount_given'] ?? 0;
+            }
+        }
+        $shift->cashback_given = $cashbackGiven;
+
+        // Amount remitted and unremitted
+        $shift->amount_remitted = $shift->cash_given - $cashbackGiven;
+        $shift->amount_unremitted = $cashbackGiven;
+        $shift->change_owed = 0;
+
+        // Fillup Payments - Calculate from approved purchases on this shift's date
+        $fillupPayments = 0;
+        if ($shift->date) {
+            $purchases = \App\Models\Purchase::where('status', 'approved')
+                ->whereDate('purchase_date', $shift->date)
+                ->get();
+            foreach ($purchases as $purchase) {
+                $fillupPayments += $purchase->grand_total ?? 0;
+            }
+        }
+        $shift->fillup_payments = $fillupPayments;
+
+        // Include credit retail sales (retail sales with payment_method = 'credit' for this shift)
+        $creditRetailSales = \App\Models\RetailSale::with('items.product')
+            ->where('shift_id', $shift->id)
+            ->where('payment_method', 'credit')
+            ->get()
+            ->map(function ($sale) {
+                $productName = '';
+                $productId = null;
+                $quantity = 0;
+                if ($sale->items && $sale->items->count() > 0) {
+                    $item = $sale->items->first();
+                    $productName = $item->product->name ?? '';
+                    $productId = $item->product_id;
+                    $quantity = $item->quantity;
+                }
+                return [
+                    'customer_name' => $sale->notes ? explode("\n", explode(":", $sale->notes)[1] ?? '')[0] ?? '' : '',
+                    'product_name' => $productName,
+                    'product_id' => $productId,
+                    'quantity' => $quantity,
+                    'amount' => $sale->grand_total,
+                    'payment_method' => $sale->payment_method,
+                    'invoice_number' => $sale->invoice_number,
+                    'sale_date' => $sale->sale_date,
+                ];
+            });
+        $shift->credit_retail_sales = $creditRetailSales;
 
         return response()->json($shift);
     }
@@ -95,6 +234,9 @@ class ShiftController extends Controller
             'name' => 'required|string|max:255',
             'date' => 'required|date',
             'duration' => 'required|string',
+            'nozzle_readings' => 'nullable|array',
+            'nozzle_readings.*.nozzle_id' => 'required|integer|exists:nozzles,id',
+            'nozzle_readings.*.opening_reading' => 'required|numeric|min:0',
         ]);
 
         // Check if there is already an open shift
@@ -120,6 +262,34 @@ class ShiftController extends Controller
         $validated['shift_id'] = str_pad($nextId, 3, '0', STR_PAD_LEFT);
 
         $validated['status'] = 'open';
+        $validated['opened_by'] = $request->user()->id;
+
+        // Use provided nozzle readings if any, otherwise snapshot from DB
+        if ($request->has('nozzle_readings') && is_array($request->nozzle_readings)) {
+            $providedReadings = $request->nozzle_readings;
+            $nozzles = \App\Models\Nozzle::with('tank.product')->get();
+            $nozzleReadings = [];
+            foreach ($nozzles as $nozzle) {
+                $provided = collect($providedReadings)->firstWhere('nozzle_id', $nozzle->id);
+                $nozzleReadings[] = [
+                    'nozzle_id' => $nozzle->id,
+                    'nozzle_name' => $nozzle->name,
+                    'tank_name' => $nozzle->tank->name ?? 'N/A',
+                    'product_name' => $nozzle->tank->product->name ?? 'N/A',
+                    'opening_reading' => $provided['opening_reading'] ?? $nozzle->reading,
+                    'closing_reading' => 0,
+                    'qty_sold' => 0,
+                    'rtt' => 0,
+                    'revenue' => 0,
+                    'retail_sales' => 0,
+                    'retail_revenue' => 0,
+                    'total_revenue' => 0,
+                    'shortage' => 0,
+                    'overage' => 0,
+                ];
+            }
+            $validated['nozzle_readings'] = $nozzleReadings;
+        }
 
         // Calculate expiry date
         $duration = $validated['duration'];
@@ -139,28 +309,30 @@ class ShiftController extends Controller
         
         $validated['expiry_date'] = $expiryDate;
 
-        // Snapshot Nozzle Readings (Opening Readings)
-        $nozzles = \App\Models\Nozzle::with('tank.product')->get();
-        $nozzleReadings = [];
-        foreach ($nozzles as $nozzle) {
-            $nozzleReadings[] = [
-                'nozzle_id' => $nozzle->id,
-                'nozzle_name' => $nozzle->name, // Snapshot name
-                'tank_name' => $nozzle->tank->name ?? 'N/A',
-                'product_name' => $nozzle->tank->product->name ?? 'N/A',
-                'opening_reading' => $nozzle->reading, // Current reading as opening
-                'closing_reading' => 0,
-                'qty_sold' => 0,
-                'rtt' => 0,
-                'revenue' => 0,
-                'retail_sales' => 0,
-                'retail_revenue' => 0,
-                'total_revenue' => 0,
-                'shortage' => 0,
-                'overage' => 0,
-            ];
+        // If no nozzle readings provided in request, snapshot from DB
+        if (!$request->has('nozzle_readings') || !is_array($request->nozzle_readings)) {
+            $nozzles = \App\Models\Nozzle::with('tank.product')->get();
+            $nozzleReadings = [];
+            foreach ($nozzles as $nozzle) {
+                $nozzleReadings[] = [
+                    'nozzle_id' => $nozzle->id,
+                    'nozzle_name' => $nozzle->name,
+                    'tank_name' => $nozzle->tank->name ?? 'N/A',
+                    'product_name' => $nozzle->tank->product->name ?? 'N/A',
+                    'opening_reading' => $nozzle->reading,
+                    'closing_reading' => 0,
+                    'qty_sold' => 0,
+                    'rtt' => 0,
+                    'revenue' => 0,
+                    'retail_sales' => 0,
+                    'retail_revenue' => 0,
+                    'total_revenue' => 0,
+                    'shortage' => 0,
+                    'overage' => 0,
+                ];
+            }
+            $validated['nozzle_readings'] = $nozzleReadings;
         }
-        $validated['nozzle_readings'] = $nozzleReadings;
 
         $shift = Shift::create($validated);
 
@@ -263,13 +435,35 @@ class ShiftController extends Controller
             return response()->json(['message' => 'Shift is not open'], 400);
         }
 
-        $shift->update([
-            'status' => 'closed',
-            'closed_at' => now(),
-            'closed_by' => $request->user()->id,
-        ]);
+        $this->calculateShiftSales($shift);
 
-        return response()->json($shift);
+        // Validate and deduct tank content
+        $tankSales = $this->getTankSalesFromShift($shift);
+        foreach ($tankSales as $tankId => $qtySold) {
+            $tank = \App\Models\Tank::find($tankId);
+            if (!$tank) continue;
+
+            if ((float) $tank->content < $qtySold) {
+                return response()->json([
+                    'message' => "Cannot close shift. Tank {$tank->name} has only {$tank->content} litres but {$qtySold} litres were sold."
+                ], 422);
+            }
+        }
+
+        foreach ($tankSales as $tankId => $qtySold) {
+            $tank = \App\Models\Tank::find($tankId);
+            if ($tank) {
+                $tank->content = max(0, (float) $tank->content - $qtySold);
+                $tank->save();
+            }
+        }
+
+        $shift->status = 'closed';
+        $shift->closed_at = now();
+        $shift->closed_by = $request->user()->id;
+        $shift->save();
+
+        return response()->json($shift->fresh(['closedByUser', 'approvedByUser']));
     }
 
     /**
@@ -283,13 +477,14 @@ class ShiftController extends Controller
             return response()->json(['message' => 'Shift is already approved'], 400);
         }
 
-        $shift->update([
-            'status' => 'approved',
-            'approved_at' => now(),
-            'approved_by' => $request->user()->id,
-        ]);
+        $this->calculateShiftSales($shift);
 
-        return response()->json($shift);
+        $shift->status = 'approved';
+        $shift->approved_at = now();
+        $shift->approved_by = $request->user()->id;
+        $shift->save();
+
+        return response()->json($shift->fresh(['closedByUser', 'approvedByUser']));
     }
 
     /**
@@ -306,6 +501,7 @@ class ShiftController extends Controller
             'nozzle_readings.*.rtt' => 'nullable|numeric|min:0',
             'nozzle_readings.*.cash_over' => 'nullable|numeric|min:0',
             'nozzle_readings.*.cash_shortage' => 'nullable|numeric|min:0',
+            'nozzle_readings.*.tank_id' => 'nullable|integer|exists:tanks,id',
             'credit_sales' => 'nullable|array',
             'credit_sales.*.customer_id' => 'required|integer|exists:customers,id',
             'credit_sales.*.product_id' => 'required|integer|exists:products,id',
@@ -313,17 +509,76 @@ class ShiftController extends Controller
             'credit_sales.*.discount' => 'nullable|numeric|min:0',
             'credit_sales.*.narration' => 'nullable|string',
             'credit_sales.*.ledger_notes' => 'nullable|string',
+            'credit_sales.*.driver_name' => 'nullable|string',
+            'credit_sales.*.truck_no' => 'nullable|string',
+            'nozzle_reading_name' => 'nullable|string',
+            'additional_readings' => 'nullable|array',
+            'additional_readings.*.name' => 'nullable|string',
+            'additional_readings.*.readings' => 'required|array',
+            'additional_readings.*.readings.*.nozzle_id' => 'required|integer|exists:nozzles,id',
+            'additional_readings.*.readings.*.closing_reading' => 'required|numeric|min:0',
+            'additional_readings.*.readings.*.rtt' => 'nullable|numeric|min:0',
+            'additional_readings.*.readings.*.cash_over' => 'nullable|numeric|min:0',
+            'additional_readings.*.readings.*.cash_shortage' => 'nullable|numeric|min:0',
+            'additional_readings.*.readings.*.tank_id' => 'nullable|integer|exists:tanks,id',
+            'cashbacks' => 'nullable|array',
+            'cashbacks.*.receipt_number' => 'nullable|string',
+            'cashbacks.*.driver_name' => 'nullable|string',
+            'cashbacks.*.driver_phone' => 'nullable|string',
+            'cashbacks.*.amount_given' => 'nullable|numeric|min:0',
+            'expenses' => 'nullable|array',
+            'expenses.*.description' => 'required|string',
+            'expenses.*.amount' => 'required|numeric|min:0',
         ]);
 
         // Store nozzle readings in shift's metadata or separate table
         // For now, we'll store in a JSON column
         if (isset($validated['nozzle_readings'])) {
-            $shift->nozzle_readings = $validated['nozzle_readings'];
+            // Preserve existing structure and merge closing readings
+            $updatedNozzleReadings = [];
+            foreach ($shift->nozzle_readings as $reading) {
+                foreach ($validated['nozzle_readings'] as $newReading) {
+                    if ($reading['nozzle_id'] === $newReading['nozzle_id']) {
+                        $reading['closing_reading'] = $newReading['closing_reading'] ?? 0;
+                        $reading['rtt'] = $newReading['rtt'] ?? 0;
+                        $reading['cash_over'] = $newReading['cash_over'] ?? 0;
+                        $reading['cash_shortage'] = $newReading['cash_shortage'] ?? 0;
+                        $reading['tank_id'] = $newReading['tank_id'] ?? ($reading['tank_id'] ?? null);
+                        $opening = $reading['opening_reading'] ?? 0;
+                        $closing = $reading['closing_reading'];
+                        $rtt = $reading['rtt'];
+                        $reading['qty_sold'] = max(0, $closing - $opening - $rtt);
+                        break;
+                    }
+                }
+                $updatedNozzleReadings[] = $reading;
+            }
+            $shift->nozzle_readings = $updatedNozzleReadings;
+        }
+
+        // Store the main reading name
+        if ($request->has('nozzle_reading_name')) {
+            $shift->nozzle_reading_name = $request->nozzle_reading_name;
+        }
+
+        // Store additional reading snapshots
+        if ($request->has('additional_readings')) {
+            $shift->additional_readings = $request->additional_readings;
         }
 
         // Store credit sales data
         if (isset($validated['credit_sales'])) {
             $shift->credit_sales_data = $validated['credit_sales'];
+        }
+
+        // Store cashbacks data
+        if (isset($validated['cashbacks'])) {
+            $shift->cashbacks_data = $validated['cashbacks'];
+        }
+
+        // Store expenses data
+        if (isset($validated['expenses'])) {
+            $shift->expenses_data = $validated['expenses'];
         }
 
         $shift->save();
@@ -344,6 +599,8 @@ class ShiftController extends Controller
         // Clear nozzle readings and credit sales data
         $shift->nozzle_readings = null;
         $shift->credit_sales_data = null;
+        $shift->cashbacks_data = null;
+        $shift->expenses_data = null;
         $shift->save();
 
         return response()->json([
@@ -363,6 +620,16 @@ class ShiftController extends Controller
             return response()->json([
                 'message' => 'Only closed shifts can be returned/re-opened.'
             ], 400);
+        }
+
+        // Restore tank content from this shift's sales
+        $tankSales = $this->getTankSalesFromShift($shift);
+        foreach ($tankSales as $tankId => $qtySold) {
+            $tank = \App\Models\Tank::find($tankId);
+            if ($tank) {
+                $tank->content = min((float) $tank->capacity, (float) $tank->content + $qtySold);
+                $tank->save();
+            }
         }
 
         $shift->status = 'open';
@@ -415,6 +682,131 @@ class ShiftController extends Controller
         $shift->delete();
 
         return response()->json(['message' => 'Shift deleted successfully']);
+    }
+
+    /**
+     * Recalculate sales values for all closed/approved shifts
+     */
+    public function recalculateSales()
+    {
+        $shifts = Shift::whereIn('status', ['closed', 'approved'])->get();
+        $count = 0;
+        foreach ($shifts as $shift) {
+            $this->calculateShiftSales($shift);
+            $shift->save();
+            $count++;
+        }
+
+        return response()->json([
+            'message' => "Recalculated sales for {$count} shifts",
+            'count' => $count,
+        ]);
+    }
+
+    /**
+     * Calculate total quantity sold per tank from shift nozzle readings
+     */
+    private function getTankSalesFromShift(Shift $shift): array
+    {
+        $tankQty = [];
+        $prevClosingPerNozzle = [];
+
+        // Main nozzle readings
+        foreach ($shift->nozzle_readings ?? [] as $reading) {
+            $opening = (float) ($reading['opening_reading'] ?? 0);
+            $closing = (float) ($reading['closing_reading'] ?? 0);
+            $rtt = (float) ($reading['rtt'] ?? 0);
+            $qtySold = max(0, $closing - $opening - $rtt);
+
+            $tankId = $reading['tank_id'] ?? null;
+            if (!$tankId) {
+                $nozzle = \App\Models\Nozzle::find($reading['nozzle_id'] ?? null);
+                $tankId = $nozzle?->tank_id;
+            }
+
+            if ($tankId) {
+                $tankQty[$tankId] = ($tankQty[$tankId] ?? 0) + $qtySold;
+            }
+
+            $prevClosingPerNozzle[$reading['nozzle_id']] = $closing;
+        }
+
+        // Additional snapshot readings
+        foreach ($shift->additional_readings ?? [] as $snapshot) {
+            foreach ($snapshot['readings'] ?? [] as $r) {
+                $closing = (float) ($r['closing_reading'] ?? 0);
+                $rtt = (float) ($r['rtt'] ?? 0);
+                $opening = $prevClosingPerNozzle[$r['nozzle_id']] ?? 0;
+                $qtySold = max(0, $closing - $opening - $rtt);
+
+                $tankId = $r['tank_id'] ?? null;
+                if (!$tankId) {
+                    $nozzle = \App\Models\Nozzle::find($r['nozzle_id'] ?? null);
+                    $tankId = $nozzle?->tank_id;
+                }
+
+                if ($tankId) {
+                    $tankQty[$tankId] = ($tankQty[$tankId] ?? 0) + $qtySold;
+                }
+
+                $prevClosingPerNozzle[$r['nozzle_id']] = $closing;
+            }
+        }
+
+        return $tankQty;
+    }
+
+    /**
+     * Calculate cash_sales, credit_sales, and sales_revenue from shift data
+     */
+    private function calculateShiftSales(Shift $shift): void
+    {
+        $totalRevenue = 0;
+        $creditSalesTotal = 0;
+
+        // Get product prices map for quick lookup
+        $products = \App\Models\Product::all()->keyBy('id');
+
+        // Calculate total revenue from nozzle readings (qty_sold * retail_price)
+        $nozzleReadings = $shift->nozzle_readings;
+        if (is_array($nozzleReadings)) {
+            foreach ($nozzleReadings as $reading) {
+                $opening = (float) ($reading['opening_reading'] ?? 0);
+                $closing = (float) ($reading['closing_reading'] ?? 0);
+                $rtt = (float) ($reading['rtt'] ?? 0);
+                $qtySold = max(0, $closing - $opening - $rtt);
+
+                $nozzleId = $reading['nozzle_id'] ?? null;
+                $price = 0;
+                if ($nozzleId) {
+                    $nozzle = \App\Models\Nozzle::with('tank.product')->find($nozzleId);
+                    $price = $nozzle && $nozzle->tank && $nozzle->tank->product
+                        ? (float) ($nozzle->tank->product->retail_price ?? 0)
+                        : 0;
+                }
+
+                $totalRevenue += $qtySold * $price;
+            }
+        }
+
+        // Calculate credit sales from credit_sales_data
+        $creditSalesData = $shift->credit_sales_data;
+        if (is_array($creditSalesData)) {
+            foreach ($creditSalesData as $cs) {
+                $qty = (float) ($cs['quantity'] ?? 0);
+                $discount = (float) ($cs['discount'] ?? 0);
+                $productId = $cs['product_id'] ?? null;
+                $product = $productId ? ($products->get($productId) ?? \App\Models\Product::find($productId)) : null;
+                $price = $product ? (float) ($product->retail_price ?? 0) : 0;
+                $creditSalesTotal += max(0, ($qty * $price) - $discount);
+            }
+        }
+
+        $cashSales = max(0, $totalRevenue - $creditSalesTotal);
+
+        $shift->cash_sales = $cashSales;
+        $shift->credit_sales = $creditSalesTotal;
+        $shift->sales_revenue = $totalRevenue;
     }
 }
 

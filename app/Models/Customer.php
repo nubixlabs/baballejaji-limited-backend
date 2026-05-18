@@ -22,6 +22,8 @@ class Customer extends Model
         'credit_limit',
         'credit_balance',
         'customer_type',
+        'opening_balance_debit',
+        'opening_balance_credit',
     ];
 
     protected $casts = [

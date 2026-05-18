@@ -12,6 +12,9 @@ class DailySaleController extends Controller
      */
     public function index(Request $request)
     {
+        if (!\Illuminate\Support\Facades\Schema::hasTable('daily_sales')) {
+            return response()->json([]);
+        }
         $query = DailySale::with(['shift', 'product']);
 
         // Filter by shift

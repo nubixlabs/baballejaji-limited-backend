@@ -185,7 +185,10 @@ class AccountSeeder extends Seeder
         ];
 
         foreach ($accounts as $account) {
-            Account::create($account);
+            Account::firstOrCreate(
+                ['code' => $account['code']],
+                $account
+            );
         }
     }
 }

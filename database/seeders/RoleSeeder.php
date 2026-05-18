@@ -14,6 +14,11 @@ class RoleSeeder extends Seeder
     {
         $roles = [
             [
+                'name' => 'super_admin',
+                'display_name' => 'Super Admin',
+                'description' => 'Full system access with all permissions',
+            ],
+            [
                 'name' => 'filling_station',
                 'display_name' => 'Filling Station',
                 'description' => 'Users who manage filling stations',

@@ -14,6 +14,24 @@ class DefaultUserSeeder extends Seeder
      */
     public function run(): void
     {
+        // Get the super admin role
+        $superAdminRole = Role::where('name', 'super_admin')->first();
+        if ($superAdminRole) {
+            User::firstOrCreate(
+                ['email' => 'superadmin@nubixlabs.com'],
+                [
+                    'name' => 'Super Admin',
+                    'email' => 'superadmin@nubixlabs.com',
+                    'password' => Hash::make('password123'),
+                    'role_id' => $superAdminRole->id,
+                    'username' => 'superadmin',
+                    'phone' => '08000000000',
+                    'is_active' => true,
+                    'email_verified_at' => now(),
+                ]
+            );
+        }
+
         // Get the filling station role
         $fillingStationRole = Role::where('name', 'filling_station')->first();
         

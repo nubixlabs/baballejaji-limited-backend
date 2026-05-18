@@ -1,13 +1,16 @@
 #!/usr/bin/env bash
 
-# Ensure SQLite database directory exists and is writable
+# Ensure SQLite database directory exists and is writable by www-data
 DB_PATH=$(/usr/bin/php -r "echo env('DB_DATABASE', database_path('database.sqlite'));" 2>/dev/null || echo "")
 if [ -z "$DB_PATH" ]; then
   DB_PATH="/data/database.sqlite"
 fi
 mkdir -p "$(dirname "$DB_PATH")"
 touch "$DB_PATH"
+chown www-data:www-data "$(dirname "$DB_PATH")" 2>/dev/null || true
 chown www-data:www-data "$DB_PATH" 2>/dev/null || true
+chmod 775 "$(dirname "$DB_PATH")" 2>/dev/null || true
+chmod 664 "$DB_PATH" 2>/dev/null || true
 
 # Run pending migrations
 /usr/bin/php /var/www/html/artisan migrate --force --no-ansi -q 2>/dev/null || true

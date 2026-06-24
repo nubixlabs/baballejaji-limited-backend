@@ -3,6 +3,7 @@
 namespace Database\Seeders;
 
 use App\Models\Product;
+use App\Models\FillingStation;
 use Illuminate\Database\Seeder;
 
 class ProductSeeder extends Seeder
@@ -12,6 +13,12 @@ class ProductSeeder extends Seeder
      */
     public function run(): void
     {
+        $stationId = FillingStation::value('id');
+        if (!$stationId) {
+            $this->command->warn('No filling station found. Skipping ProductSeeder.');
+            return;
+        }
+
         $products = [
             [
                 'code' => 'PMS',
@@ -47,7 +54,7 @@ class ProductSeeder extends Seeder
         foreach ($products as $productData) {
             Product::updateOrCreate(
                 ['code' => $productData['code']],
-                $productData
+                array_merge($productData, ['filling_station_id' => $stationId])
             );
         }
      

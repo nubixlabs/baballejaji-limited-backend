@@ -5,12 +5,19 @@ namespace Database\Seeders;
 use App\Models\Nozzle;
 use App\Models\Tank;
 use App\Models\Product;
+use App\Models\FillingStation;
 use Illuminate\Database\Seeder;
 
 class NozzleSeeder extends Seeder
 {
     public function run(): void
     {
+        $stationId = FillingStation::value('id');
+        if (!$stationId) {
+            $this->command->warn('No filling station found. Skipping NozzleSeeder.');
+            return;
+        }
+
         $pmsTanks = Tank::whereHas('product', function ($q) {
             $q->where('code', 'PMS');
         })->get();
@@ -90,7 +97,7 @@ class NozzleSeeder extends Seeder
         }
 
         foreach ($nozzles as $nozzle) {
-            Nozzle::create($nozzle);
+            Nozzle::create(array_merge($nozzle, ['filling_station_id' => $stationId]));
         }
     }
 }

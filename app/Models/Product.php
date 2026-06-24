@@ -6,12 +6,14 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class Product extends Model
 {
     use HasFactory;
 
     protected $fillable = [
+        'filling_station_id',
         'code',
         'name',
         'si_unit',
@@ -29,6 +31,7 @@ class Product extends Model
     protected $appends = [
         'created_by_name',
         'last_modified_by_name',
+        'filling_station_name',
     ];
 
     protected $casts = [
@@ -39,6 +42,12 @@ class Product extends Model
         'bulk_price' => 'decimal:2',
         're_order_level' => 'decimal:2',
     ];
+
+    public function fillingStations(): BelongsToMany
+    {
+        return $this->belongsToMany(FillingStation::class, 'filling_station_product')
+            ->withTimestamps();
+    }
 
     public function tanks(): HasMany
     {
@@ -73,6 +82,14 @@ class Product extends Model
     public function getLastModifiedByNameAttribute(): ?string
     {
         return optional($this->lastModifier)->name;
+    }
+
+    public function getFillingStationNameAttribute(): ?string
+    {
+        if ($this->relationLoaded('fillingStations')) {
+            return $this->fillingStations->pluck('name')->implode(', ');
+        }
+        return $this->filling_station_id ? "Station #{$this->filling_station_id}" : null;
     }
 }
 

@@ -6,7 +6,10 @@ use Illuminate\Database\Eloquent\Model;
 
 class Distribution extends Model
 {
+    use \App\Traits\BelongsToFillingStation;
+
     protected $fillable = [
+        'filling_station_id',
         'bulk_sale_id',
         'tank_id',
         'nozzle_id',

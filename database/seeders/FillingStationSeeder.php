@@ -37,7 +37,7 @@ class FillingStationSeeder extends Seeder
         ];
 
         foreach ($tankGroups as $group) {
-            TankGroup::create($group);
+            TankGroup::create(array_merge($group, ['filling_station_id' => $station->id]));
         }
 
         // Create products
@@ -84,7 +84,7 @@ class FillingStationSeeder extends Seeder
         ];
 
         foreach ($products as $product) {
-            Product::create($product);
+            Product::create(array_merge($product, ['filling_station_id' => $station->id]));
         }
 
         // Create tanks
@@ -162,7 +162,7 @@ class FillingStationSeeder extends Seeder
         ];
 
         foreach ($customers as $customer) {
-            Customer::create($customer);
+            Customer::create(array_merge($customer, ['filling_station_id' => $station->id]));
         }
 
         $this->command->info('Filling station seed data created successfully!');

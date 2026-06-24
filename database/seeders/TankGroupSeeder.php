@@ -3,12 +3,19 @@
 namespace Database\Seeders;
 
 use App\Models\TankGroup;
+use App\Models\FillingStation;
 use Illuminate\Database\Seeder;
 
 class TankGroupSeeder extends Seeder
 {
     public function run(): void
     {
+        $stationId = FillingStation::value('id');
+        if (!$stationId) {
+            $this->command->warn('No filling station found. Skipping TankGroupSeeder.');
+            return;
+        }
+
         $tankGroups = [
             [
                 'name' => 'PRODUCT TANKS',
@@ -21,7 +28,7 @@ class TankGroupSeeder extends Seeder
         ];
 
         foreach ($tankGroups as $group) {
-            TankGroup::create($group);
+            TankGroup::create(array_merge($group, ['filling_station_id' => $stationId]));
         }
     }
 }

@@ -6,7 +6,10 @@ use Illuminate\Database\Eloquent\Model;
 
 class BankTransfer extends Model
 {
+    use \App\Traits\BelongsToFillingStation;
+
     protected $fillable = [
+        'filling_station_id',
         'shift_id',
         'amount_transferred',
         'bank',

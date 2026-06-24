@@ -5,6 +5,7 @@ namespace Database\Seeders;
 use App\Models\FuelTicket;
 use App\Models\Product;
 use App\Models\User;
+use App\Models\FillingStation;
 use Illuminate\Database\Seeder;
 use Carbon\Carbon;
 
@@ -12,6 +13,12 @@ class FuelTicketSeeder extends Seeder
 {
     public function run(): void
     {
+        $stationId = FillingStation::value('id');
+        if (!$stationId) {
+            $this->command->warn('No filling station found. Skipping FuelTicketSeeder.');
+            return;
+        }
+
         $pmsProduct = Product::where('code', 'PMS')->first();
         $agoProduct = Product::where('code', 'AGO')->first();
         $user = User::first();
@@ -100,7 +107,7 @@ class FuelTicketSeeder extends Seeder
         ];
 
         foreach ($fuelTickets as $ticket) {
-            FuelTicket::create($ticket);
+            FuelTicket::create(array_merge($ticket, ['filling_station_id' => $stationId]));
         }
     }
 }

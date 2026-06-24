@@ -4,12 +4,19 @@ namespace Database\Seeders;
 
 use App\Models\Tank;
 use App\Models\Product;
+use App\Models\FillingStation;
 use Illuminate\Database\Seeder;
 
 class TankSeeder extends Seeder
 {
     public function run(): void
     {
+        $stationId = FillingStation::value('id');
+        if (!$stationId) {
+            $this->command->warn('No filling station found. Skipping TankSeeder.');
+            return;
+        }
+
         $pmsProduct = Product::where('code', 'PMS')->first();
         $agoProduct = Product::where('code', 'AGO')->first();
         $dpkProduct = Product::where('code', 'DPK')->first();
@@ -64,7 +71,7 @@ class TankSeeder extends Seeder
 
         foreach ($tanks as $tank) {
             if ($tank['product_id']) {
-                Tank::create($tank);
+                Tank::create(array_merge($tank, ['filling_station_id' => $stationId]));
             }
         }
     }

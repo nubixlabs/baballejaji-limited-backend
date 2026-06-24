@@ -5,12 +5,19 @@ namespace Database\Seeders;
 use App\Models\Staff;
 use App\Models\Department;
 use App\Models\Level;
+use App\Models\FillingStation;
 use Illuminate\Database\Seeder;
 
 class StaffSeeder extends Seeder
 {
     public function run(): void
     {
+        $stationId = FillingStation::value('id');
+        if (!$stationId) {
+            $this->command->warn('No filling station found. Skipping StaffSeeder.');
+            return;
+        }
+
         $operations = Department::where('name', 'Operations')->first();
         $admin = Department::where('name', 'Administration')->first();
         $transport = Department::where('name', 'Transport')->first();
@@ -82,7 +89,7 @@ class StaffSeeder extends Seeder
         ];
 
         foreach ($staff as $member) {
-            Staff::create($member);
+            Staff::create(array_merge($member, ['filling_station_id' => $stationId]));
         }
     }
 }

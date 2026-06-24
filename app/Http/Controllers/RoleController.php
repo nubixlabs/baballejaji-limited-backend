@@ -47,10 +47,17 @@ class RoleController extends Controller
         $role = Role::findOrFail($id);
 
         $validated = $request->validate([
-            'name' => 'required|string|max:255|unique:roles,name,' . $role->id,
+            'name' => 'sometimes|required|string|max:255|unique:roles,name,' . $role->id,
             'display_name' => 'nullable|string|max:255',
             'description' => 'nullable|string',
+            'permissions' => 'nullable|array',
+            'permissions.*' => 'string',
         ]);
+
+        // Merge permissions instead of replacing if not provided
+        if ($request->has('permissions')) {
+            $validated['permissions'] = $request->permissions;
+        }
 
         $role->update($validated);
 

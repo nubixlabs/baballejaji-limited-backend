@@ -3,6 +3,7 @@
 namespace Database\Seeders;
 
 use App\Models\Supplier;
+use App\Models\FillingStation;
 use Illuminate\Database\Seeder;
 
 class SupplierSeeder extends Seeder
@@ -12,6 +13,12 @@ class SupplierSeeder extends Seeder
      */
     public function run(): void
     {
+        $stationId = FillingStation::value('id');
+        if (!$stationId) {
+            $this->command->warn('No filling station found. Skipping SupplierSeeder.');
+            return;
+        }
+
         $suppliers = [
             [
                 'name' => 'Nigerian National Petroleum Corporation (NNPC)',
@@ -119,8 +126,8 @@ class SupplierSeeder extends Seeder
 
         foreach ($suppliers as $supplierData) {
             Supplier::updateOrCreate(
-                ['email' => $supplierData['email']],
-                $supplierData
+                ['name' => $supplier['name']],
+                array_merge($supplier, ['filling_station_id' => $stationId])
             );
         }
 

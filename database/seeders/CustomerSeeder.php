@@ -3,12 +3,19 @@
 namespace Database\Seeders;
 
 use App\Models\Customer;
+use App\Models\FillingStation;
 use Illuminate\Database\Seeder;
 
 class CustomerSeeder extends Seeder
 {
     public function run(): void
     {
+        $stationId = FillingStation::value('id');
+        if (!$stationId) {
+            $this->command->warn('No filling station found. Skipping CustomerSeeder.');
+            return;
+        }
+
         $customers = [
             [
                 'company' => 'ABC Transport Ltd',
@@ -78,7 +85,7 @@ class CustomerSeeder extends Seeder
         ];
 
         foreach ($customers as $customer) {
-            Customer::create($customer);
+            Customer::create(array_merge($customer, ['filling_station_id' => $stationId]));
         }
     }
 }

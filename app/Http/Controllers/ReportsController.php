@@ -66,10 +66,13 @@ class ReportsController extends Controller
 
         $limit = $request->get('limit', 10);
 
+        $fillingStationId = $request->header('X-Filling-Station-Id');
+
         $rows = DB::table('order_items')
             ->join('orders', 'order_items.order_id', '=', 'orders.id')
             ->join('parts', 'order_items.part_id', '=', 'parts.id')
             ->where('orders.status', 'completed')
+            ->when($fillingStationId, fn($q) => $q->where('orders.filling_station_id', $fillingStationId))
             ->where('orders.created_at', '>=', $dateFrom)
             ->select(
                 'parts.id',

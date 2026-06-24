@@ -7,6 +7,21 @@ use Illuminate\Http\Request;
 
 class ProductController extends Controller
 {
+    private function getFillingStationId(Request $request): ?int
+    {
+        $id = $request->header('X-Filling-Station-Id');
+        return ($id && is_numeric($id)) ? (int) $id : null;
+    }
+
+    private function applyFillingStationScope($query, ?int $fillingStationId): void
+    {
+        if ($fillingStationId) {
+            $query->whereHas('fillingStations', function($q) use ($fillingStationId) {
+                $q->where('filling_station_id', $fillingStationId);
+            });
+        }
+    }
+
     /**
      * @OA\Get(
      *   path="/api/filling/products",
@@ -18,9 +33,9 @@ class ProductController extends Controller
      */
     public function index(Request $request)
     {
-        $query = Product::query();
+        $query = Product::query()->with('fillingStations');
+        $fillingStationId = $this->getFillingStationId($request);
 
-        // Search functionality
         if ($request->has('search')) {
             $search = $request->search;
             $query->where(function($q) use ($search) {
@@ -40,6 +55,8 @@ class ProductController extends Controller
             });
         }
 
+        $this->applyFillingStationScope($query, $fillingStationId);
+
         $products = $query->orderBy('code')->get();
         return response()->json($products);
     }
@@ -54,9 +71,11 @@ class ProductController extends Controller
      *   @OA\Response(response=200, description="Product details")
      * )
      */
-    public function show(int $id)
+    public function show(Request $request, int $id)
     {
-        $product = Product::with(['creator', 'lastModifier'])->findOrFail($id);
+        $query = Product::with(['creator', 'lastModifier', 'fillingStations']);
+        $this->applyFillingStationScope($query, $this->getFillingStationId($request));
+        $product = $query->findOrFail($id);
         return response()->json($product);
     }
 
@@ -101,12 +120,38 @@ class ProductController extends Controller
             'based_on' => 'nullable|string|max:255',
             'based_on_rate' => 'nullable|numeric|min:0',
             'category' => 'nullable|string|max:255',
+            'filling_station_id' => 'nullable|integer|exists:filling_stations,id',
+            'filling_station_ids' => 'nullable|array',
+            'filling_station_ids.*' => 'integer|exists:filling_stations,id',
         ]);
 
         $validated['created_by'] = $request->user()->id;
         $validated['last_modified_by'] = $request->user()->id;
 
+        // When called from filling-station level, auto-assign station from header
+        $fillingStationId = $this->getFillingStationId($request);
+        if ($fillingStationId && !$request->has('filling_station_ids')) {
+            $validated['filling_station_id'] = $fillingStationId;
+            $stationIds = [$fillingStationId];
+        } else {
+            $stationIds = $request->filling_station_ids ?? [];
+        }
+
+        // Set primary filling_station_id from first in array if not explicitly set
+        if (!$validated['filling_station_id'] && !empty($stationIds)) {
+            $validated['filling_station_id'] = $stationIds[0];
+        }
+
         $product = Product::create($validated);
+
+        // Sync pivot table with all assigned stations
+        if (!empty($stationIds)) {
+            $product->fillingStations()->sync($stationIds);
+        } elseif ($validated['filling_station_id']) {
+            $product->fillingStations()->sync([$validated['filling_station_id']]);
+        }
+
+        $product->load('fillingStations');
         return response()->json($product, 201);
     }
 
@@ -136,7 +181,9 @@ class ProductController extends Controller
      */
     public function update(Request $request, int $id)
     {
-        $product = Product::findOrFail($id);
+        $query = Product::query();
+        $this->applyFillingStationScope($query, $this->getFillingStationId($request));
+        $product = $query->findOrFail($id);
 
         $validated = $request->validate([
             'code' => 'sometimes|required|string|max:255|unique:products,code,' . $product->id,
@@ -152,11 +199,24 @@ class ProductController extends Controller
             'based_on' => 'nullable|string|max:255',
             'based_on_rate' => 'nullable|numeric|min:0',
             'category' => 'nullable|string|max:255',
+            'filling_station_id' => 'nullable|integer|exists:filling_stations,id',
+            'filling_station_ids' => 'nullable|array',
+            'filling_station_ids.*' => 'integer|exists:filling_stations,id',
         ]);
 
         $validated['last_modified_by'] = $request->user()->id;
+
+        if ($request->has('filling_station_ids') && !empty($request->filling_station_ids) && !$request->has('filling_station_id')) {
+            $validated['filling_station_id'] = $request->filling_station_ids[0];
+        }
+
         $product->update($validated);
 
+        if ($request->has('filling_station_ids')) {
+            $product->fillingStations()->sync($request->filling_station_ids);
+        }
+
+        $product->load('fillingStations');
         return response()->json($product);
     }
 
@@ -170,9 +230,11 @@ class ProductController extends Controller
      *   @OA\Response(response=200, description="Product deleted")
      * )
      */
-    public function destroy(int $id)
+    public function destroy(Request $request, int $id)
     {
-        $product = Product::findOrFail($id);
+        $query = Product::query();
+        $this->applyFillingStationScope($query, $this->getFillingStationId($request));
+        $product = $query->findOrFail($id);
         $product->delete();
 
         return response()->json(['message' => 'Product deleted successfully']);
@@ -186,6 +248,8 @@ class ProductController extends Controller
         $query = Product::with(['priceAdjustments' => function($query) {
             $query->latest()->take(1);
         }]);
+
+        $this->applyFillingStationScope($query, $this->getFillingStationId($request));
 
         if ($request->has('category')) {
             $query->where('category', $request->category);

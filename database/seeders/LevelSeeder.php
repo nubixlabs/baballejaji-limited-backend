@@ -3,12 +3,19 @@
 namespace Database\Seeders;
 
 use App\Models\Level;
+use App\Models\FillingStation;
 use Illuminate\Database\Seeder;
 
 class LevelSeeder extends Seeder
 {
     public function run(): void
     {
+        $stationId = FillingStation::value('id');
+        if (!$stationId) {
+            $this->command->warn('No filling station found. Skipping LevelSeeder.');
+            return;
+        }
+
         $levels = [
             [
                 'name' => 'Entry Level',
@@ -53,7 +60,7 @@ class LevelSeeder extends Seeder
         ];
 
         foreach ($levels as $level) {
-            Level::create($level);
+            Level::create(array_merge($level, ['filling_station_id' => $stationId]));
         }
     }
 }

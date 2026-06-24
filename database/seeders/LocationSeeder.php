@@ -3,12 +3,19 @@
 namespace Database\Seeders;
 
 use App\Models\Location;
+use App\Models\FillingStation;
 use Illuminate\Database\Seeder;
 
 class LocationSeeder extends Seeder
 {
     public function run(): void
     {
+        $stationId = FillingStation::value('id');
+        if (!$stationId) {
+            $this->command->warn('No filling station found. Skipping LocationSeeder.');
+            return;
+        }
+
         $locations = [
             [
                 'name' => 'Main Station',
@@ -43,7 +50,7 @@ class LocationSeeder extends Seeder
         ];
 
         foreach ($locations as $location) {
-            Location::create($location);
+            Location::create(array_merge($location, ['filling_station_id' => $stationId]));
         }
     }
 }

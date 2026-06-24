@@ -9,9 +9,10 @@ use Carbon\Carbon;
 
 class AccountBalance extends Model
 {
-    use HasFactory;
+    use HasFactory, \App\Traits\BelongsToFillingStation;
 
     protected $fillable = [
+        'filling_station_id',
         'account_id',
         'balance_date',
         'opening_balance',

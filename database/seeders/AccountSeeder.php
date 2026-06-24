@@ -3,6 +3,7 @@
 namespace Database\Seeders;
 
 use App\Models\Account;
+use App\Models\FillingStation;
 use Illuminate\Database\Seeder;
 
 class AccountSeeder extends Seeder
@@ -12,6 +13,12 @@ class AccountSeeder extends Seeder
      */
     public function run(): void
     {
+        $stationId = FillingStation::value('id');
+        if (!$stationId) {
+            $this->command->warn('No filling station found. Skipping AccountSeeder.');
+            return;
+        }
+
         $accounts = [
             // Asset Accounts
             [
@@ -187,7 +194,7 @@ class AccountSeeder extends Seeder
         foreach ($accounts as $account) {
             Account::firstOrCreate(
                 ['code' => $account['code']],
-                $account
+                array_merge($account, ['filling_station_id' => $stationId])
             );
         }
     }

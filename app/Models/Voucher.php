@@ -10,9 +10,10 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Voucher extends Model
 {
-    use HasFactory;
+    use HasFactory, \App\Traits\BelongsToFillingStation;
 
     protected $fillable = [
+        'filling_station_id',
         'voucher_number',
         'voucher_date',
         'source_account_id',
@@ -117,17 +118,18 @@ class Voucher extends Model
      */
     protected function createJournalEntry(): JournalEntry
     {
-        $journalEntry = JournalEntry::create([
-            'journal_number' => JournalEntry::generateJournalNumber(),
-            'transaction_date' => $this->voucher_date,
-            'description' => $this->description ?: "Voucher: {$this->voucher_number}",
-            'reference' => $this->voucher_number,
-            'voucher_id' => $this->id,
-            'created_by' => $this->created_by,
-            'status' => 'approved',
-            'approved_by' => $this->approved_by,
-            'approved_at' => $this->approved_at,
-        ]);
+            $journalEntry = JournalEntry::create([
+                'journal_number' => JournalEntry::generateJournalNumber(),
+                'transaction_date' => $this->voucher_date,
+                'description' => $this->description ?: "Voucher: {$this->voucher_number}",
+                'reference' => $this->voucher_number,
+                'voucher_id' => $this->id,
+                'filling_station_id' => $this->filling_station_id,
+                'created_by' => $this->created_by,
+                'status' => 'approved',
+                'approved_by' => $this->approved_by,
+                'approved_at' => $this->approved_at,
+            ]);
 
         // Create journal entry lines from voucher line items
         foreach ($this->lineItems as $lineItem) {

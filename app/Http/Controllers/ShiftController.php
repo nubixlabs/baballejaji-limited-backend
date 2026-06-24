@@ -615,20 +615,22 @@ class ShiftController extends Controller
     {
         $shift = Shift::findOrFail($id);
         
-        // Only allow re-opening closed shifts
-        if ($shift->status !== 'closed') {
+        // Only allow re-opening closed or expired shifts
+        if (!in_array($shift->status, ['closed', 'expired'])) {
             return response()->json([
-                'message' => 'Only closed shifts can be returned/re-opened.'
+                'message' => 'Only closed or expired shifts can be returned/re-opened.'
             ], 400);
         }
 
-        // Restore tank content from this shift's sales
-        $tankSales = $this->getTankSalesFromShift($shift);
-        foreach ($tankSales as $tankId => $qtySold) {
-            $tank = \App\Models\Tank::find($tankId);
-            if ($tank) {
-                $tank->content = min((float) $tank->capacity, (float) $tank->content + $qtySold);
-                $tank->save();
+        // Restore tank content only if the shift was closed (expired shifts never deducted)
+        if ($shift->status === 'closed') {
+            $tankSales = $this->getTankSalesFromShift($shift);
+            foreach ($tankSales as $tankId => $qtySold) {
+                $tank = \App\Models\Tank::find($tankId);
+                if ($tank) {
+                    $tank->content = min((float) $tank->capacity, (float) $tank->content + $qtySold);
+                    $tank->save();
+                }
             }
         }
 

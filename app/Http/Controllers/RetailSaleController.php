@@ -65,6 +65,7 @@ class RetailSaleController extends Controller
             'discount' => 'nullable|numeric|min:0',
             'tax' => 'nullable|numeric|min:0',
             'payment_method' => 'nullable|string|in:cash,transfer,card,credit',
+            'truck_no' => 'nullable|string',
             'notes' => 'nullable|string',
         ]);
 
@@ -93,6 +94,7 @@ class RetailSaleController extends Controller
                 'tax' => $tax,
                 'grand_total' => $grandTotal,
                 'payment_method' => $validated['payment_method'] ?? 'cash',
+                'truck_no' => $validated['truck_no'] ?? null,
                 'notes' => $validated['notes'] ?? null,
                 'created_by' => $request->user()->id,
             ]);
@@ -141,6 +143,7 @@ class RetailSaleController extends Controller
             'discount' => 'nullable|numeric|min:0',
             'tax' => 'nullable|numeric|min:0',
             'payment_method' => 'nullable|string|in:cash,transfer,card,credit',
+            'truck_no' => 'nullable|string',
             'notes' => 'nullable|string',
         ]);
 

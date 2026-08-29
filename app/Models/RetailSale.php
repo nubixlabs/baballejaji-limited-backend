@@ -22,6 +22,7 @@ class RetailSale extends Model
         'tax',
         'grand_total',
         'payment_method',
+        'truck_no',
         'notes',
         'created_by',
     ];

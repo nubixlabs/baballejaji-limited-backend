@@ -9,15 +9,22 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create('filling_station_product', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('filling_station_id')->constrained()->onDelete('cascade');
-            $table->foreignId('product_id')->constrained()->onDelete('cascade');
-            $table->timestamps();
-            $table->unique(['filling_station_id', 'product_id']);
-        });
+        if (!Schema::hasTable('filling_station_product')) {
+            Schema::create('filling_station_product', function (Blueprint $table) {
+                $table->id();
+                $table->foreignId('filling_station_id')->constrained()->onDelete('cascade');
+                $table->foreignId('product_id')->constrained()->onDelete('cascade');
+                $table->timestamps();
+                $table->unique(['filling_station_id', 'product_id']);
+            });
+        }
 
-        DB::statement('INSERT INTO filling_station_product (filling_station_id, product_id, created_at, updated_at) SELECT filling_station_id, id, NOW(), NOW() FROM products WHERE filling_station_id IS NOT NULL');
+        $count = DB::table('filling_station_product')->count();
+        if ($count === 0) {
+            $driver = DB::connection()->getDriverName();
+            $now = $driver === 'sqlite' ? "datetime('now')" : 'NOW()';
+            DB::statement("INSERT INTO filling_station_product (filling_station_id, product_id, created_at, updated_at) SELECT filling_station_id, id, {$now}, {$now} FROM products WHERE filling_station_id IS NOT NULL");
+        }
     }
 
     public function down(): void

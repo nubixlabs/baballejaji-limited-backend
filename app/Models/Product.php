@@ -18,10 +18,6 @@ class Product extends Model
         'name',
         'si_unit',
         'quantity',
-        'cost_price',
-        'retail_price',
-        'dealer_price',
-        'bulk_price',
         're_order_level',
         'iot_product',
         'created_by',
@@ -36,16 +32,13 @@ class Product extends Model
 
     protected $casts = [
         'quantity' => 'decimal:2',
-        'cost_price' => 'decimal:2',
-        'retail_price' => 'decimal:2',
-        'dealer_price' => 'decimal:2',
-        'bulk_price' => 'decimal:2',
         're_order_level' => 'decimal:2',
     ];
 
     public function fillingStations(): BelongsToMany
     {
         return $this->belongsToMany(FillingStation::class, 'filling_station_product')
+            ->withPivot(['cost_price', 'retail_price', 'dealer_price', 'bulk_price'])
             ->withTimestamps();
     }
 
@@ -90,6 +83,15 @@ class Product extends Model
             return $this->fillingStations->pluck('name')->implode(', ');
         }
         return $this->filling_station_id ? "Station #{$this->filling_station_id}" : null;
+    }
+
+    public function priceForStation(?int $stationId, string $field = 'retail_price'): ?float
+    {
+        $pivot = $this->relationLoaded('fillingStations')
+            ? $this->fillingStations->where('id', $stationId)->first()?->pivot
+            : $this->fillingStations()->where('filling_station_id', $stationId)->first()?->pivot;
+
+        return $pivot?->{$field} ?? $this->{$field};
     }
 }
 

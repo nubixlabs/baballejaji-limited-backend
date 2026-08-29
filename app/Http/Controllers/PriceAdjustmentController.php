@@ -48,40 +48,70 @@ class PriceAdjustmentController extends Controller
             'reason' => 'nullable|string',
         ]);
 
+        $fillingStationId = $request->header('X-Filling-Station-Id');
+        $fillingStationId = ($fillingStationId && is_numeric($fillingStationId)) ? (int) $fillingStationId : null;
+
         DB::beginTransaction();
         try {
             $product = Product::findOrFail($validated['product_id']);
 
+            // Get old prices from pivot (station-level) or product table (global)
+            $oldCostPrice = $fillingStationId
+                ? $product->priceForStation($fillingStationId, 'cost_price')
+                : $product->cost_price;
+            $oldRetailPrice = $fillingStationId
+                ? $product->priceForStation($fillingStationId, 'retail_price')
+                : $product->retail_price;
+            $oldDealerPrice = $fillingStationId
+                ? $product->priceForStation($fillingStationId, 'dealer_price')
+                : $product->dealer_price;
+            $oldBulkPrice = $fillingStationId
+                ? $product->priceForStation($fillingStationId, 'bulk_price')
+                : $product->bulk_price;
+
             // Store old prices
             $adjustment = PriceAdjustment::create([
                 'product_id' => $product->id,
-                'old_cost_price' => $product->cost_price,
-                'new_cost_price' => $validated['new_cost_price'] ?? $product->cost_price,
-                'old_retail_price' => $product->retail_price,
-                'new_retail_price' => $validated['new_retail_price'] ?? $product->retail_price,
-                'old_dealer_price' => $product->dealer_price,
-                'new_dealer_price' => $validated['new_dealer_price'] ?? $product->dealer_price,
-                'old_bulk_price' => $product->bulk_price,
-                'new_bulk_price' => $validated['new_bulk_price'] ?? $product->bulk_price,
+                'old_cost_price' => $oldCostPrice,
+                'new_cost_price' => $validated['new_cost_price'] ?? $oldCostPrice,
+                'old_retail_price' => $oldRetailPrice,
+                'new_retail_price' => $validated['new_retail_price'] ?? $oldRetailPrice,
+                'old_dealer_price' => $oldDealerPrice,
+                'new_dealer_price' => $validated['new_dealer_price'] ?? $oldDealerPrice,
+                'old_bulk_price' => $oldBulkPrice,
+                'new_bulk_price' => $validated['new_bulk_price'] ?? $oldBulkPrice,
                 'adjustment_date' => $validated['adjustment_date'],
                 'reason' => $validated['reason'] ?? null,
                 'created_by' => $request->user()->id,
             ]);
 
-            // Update product prices
-            if (isset($validated['new_cost_price'])) {
-                $product->cost_price = $validated['new_cost_price'];
+            // Update prices — pivot for station-level, product table for global
+            $priceFields = [
+                'cost_price' => 'new_cost_price',
+                'retail_price' => 'new_retail_price',
+                'dealer_price' => 'new_dealer_price',
+                'bulk_price' => 'new_bulk_price',
+            ];
+
+            $pivotUpdates = [];
+            foreach ($priceFields as $pivotField => $requestField) {
+                if (isset($validated[$requestField])) {
+                    $pivotUpdates[$pivotField] = $validated[$requestField];
+                }
             }
-            if (isset($validated['new_retail_price'])) {
-                $product->retail_price = $validated['new_retail_price'];
+
+            if ($fillingStationId && !empty($pivotUpdates)) {
+                // Update pivot for the station
+                $product->fillingStations()->updateExistingPivot($fillingStationId, $pivotUpdates);
+            } elseif (empty($fillingStationId) && !empty($pivotUpdates)) {
+                // Fallback: update product table directly (super-admin path)
+                foreach ($priceFields as $pivotField => $requestField) {
+                    if (isset($validated[$requestField])) {
+                        $product->{$pivotField} = $validated[$requestField];
+                    }
+                }
+                $product->save();
             }
-            if (isset($validated['new_dealer_price'])) {
-                $product->dealer_price = $validated['new_dealer_price'];
-            }
-            if (isset($validated['new_bulk_price'])) {
-                $product->bulk_price = $validated['new_bulk_price'];
-            }
-            $product->save();
 
             DB::commit();
             return response()->json($adjustment->load('product'), 201);

@@ -23,13 +23,12 @@ jobs:
           key: ${{ secrets.VPS_SSH_KEY }}
           port: ${{ secrets.VPS_PORT }}
           script: |
-            cd /var/www/baballejaji-limited-backend
-            sudo git config --global --add safe.directory /var/www/baballejaji-limited-backend
+            cd /www/wwwroot/api-baballejaji.duckdns.org
+            sudo git config --global --add safe.directory /www/wwwroot/api-baballejaji.duckdns.org
             sudo git pull origin main
             sudo composer install --no-dev --optimize-autoloader
             sudo php artisan migrate --force
             sudo php artisan config:cache
             sudo php artisan route:cache
             sudo php artisan view:cache
-            sudo systemctl restart php8.4-fpm
-            sudo systemctl reload nginx
+            

@@ -20,6 +20,7 @@ class Payment extends Model
         'payment_method',
         'reference_number',
         'shift_id',
+        'batch_id',
         'sales_revenue',
         'paid_by',
         'received_by',
@@ -48,7 +49,7 @@ class Payment extends Model
      */
     public function shift(): BelongsTo
     {
-        return $this->belongsTo(Shift::class, 'shift_id', 'id');
+        return $this->belongsTo(Shift::class, 'shift_id', 'shift_id');
     }
 
     /**

@@ -361,13 +361,29 @@ class CustomerController extends Controller
             $debit = (float) $sale->grand_total;
             $runningBalance += $debit;
 
+            $driverName = '--';
+            $driverPhone = '';
+            if ($sale->notes) {
+                $lines = explode("\n", $sale->notes);
+                foreach ($lines as $line) {
+                    if (str_starts_with($line, 'Customer: ')) {
+                        $driverName = trim(substr($line, 10));
+                    }
+                    if (str_starts_with($line, 'Phone: ')) {
+                        $driverPhone = trim(substr($line, 7));
+                    }
+                }
+            }
+            if (!$driverName) $driverName = '--';
+
             $entries[] = [
                 'id' => $sale->id,
                 'date' => date('M d, Y', strtotime($sale->sale_date)),
                 'particulars' => 'Retail Sale - ' . ($sale->invoice_number ?? ''),
                 'product' => $productNames ?: '--',
-                'driver_name' => '--',
-                'truck_no' => '--',
+                'driver_name' => $driverName,
+                'driver_phone' => $driverPhone,
+                'truck_no' => $sale->truck_no ?: '--',
                 'qty' => $qty,
                 'debit' => $debit,
                 'credit' => 0,

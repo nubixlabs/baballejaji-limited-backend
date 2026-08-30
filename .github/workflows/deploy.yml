@@ -1,55 +1,73 @@
-name: Deploy to VPS
+name: Nubixedu Dev
 
 on:
   push:
     branches:
-      - main
-      - master
-  workflow_dispatch:
+      - dev
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Deploy to VPS via SSH
+      - name: Deploy Dev using SSH
         uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USERNAME }}
-          key: ${{ secrets.VPS_SSH_KEY }}
-          port: ${{ secrets.VPS_PORT }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: 22
+
           script: |
-            echo "===== SERVER INFORMATION ====="
+            set -e
 
-            echo "Connected to:"
-            hostname
+            PROJECT_DIR="${{ secrets.PROJECT_PATH_DEV }}"
 
-            echo "Server IP:"
-            hostname -I
+            echo "➡️ Deploying DEV"
+            echo "➡️ Project: $PROJECT_DIR"
 
-            echo "Current user:"
-            whoami
+            cd "$PROJECT_DIR"
 
-            echo "OS:"
-            cat /etc/os-release
+            echo "➡️ Marking repository as safe"
+            git config --global --add safe.directory "$PROJECT_DIR"
 
-            echo "PHP:"
-            php -v
+            echo "➡️ Preparing permissions for Git"
+            sudo chown -R ${{ secrets.VPS_USER }}:www storage bootstrap/cache
+            sudo find storage bootstrap/cache -type d -exec chmod 775 {} \;
+            sudo find storage bootstrap/cache -type f -exec chmod 664 {} \;
+            sudo find storage bootstrap/cache -type d -exec chmod g+s {} \;
 
-            echo "===== END SERVER INFORMATION ====="
+            echo "➡️ Syncing DEV branch"
+            git fetch origin
+            git reset --hard origin/dev
+            git clean -fd
 
-            cd /var/www/baballejaji-limited-backend
+            echo "➡️ Installing dependencies"
+            composer install --no-interaction --prefer-dist --optimize-autoloader
 
-            sudo git config --global --add safe.directory /var/www/baballejaji-limited-backend
-            sudo git pull origin main
-            sudo composer install --no-dev --optimize-autoloader
-            sudo php artisan migrate --force
-            sudo php artisan config:cache
-            sudo php artisan route:cache
-            sudo php artisan view:cache
-            sudo systemctl restart php8.4-fpm
-            sudo systemctl reload nginx
+            echo "➡️ Running school migrations"
+            php artisan migrate:school
+
+            echo "➡️ Ensuring Laravel directories exist"
+            sudo mkdir -p storage/framework/views
+            sudo mkdir -p storage/framework/cache/data
+            sudo mkdir -p storage/framework/sessions
+            sudo mkdir -p storage/logs
+            sudo mkdir -p bootstrap/cache
+
+            echo "➡️ Fixing Laravel permissions"
+            sudo chown -R ${{ secrets.VPS_USER }}:www storage bootstrap/cache
+            sudo find storage bootstrap/cache -type d -exec chmod 775 {} \;
+            sudo find storage bootstrap/cache -type f -exec chmod 664 {} \;
+            sudo find storage bootstrap/cache -type d -exec chmod g+s {} \;
+
+            echo "➡️ Clearing Laravel caches"
+            php artisan optimize:clear || true
+
+            echo "➡️ Restarting queue workers"
+            php artisan queue:restart || true
+
+            echo "➡️ Creating installation marker"
+            touch storage/installed
+
+            echo "✅ DEV deployment successful!"

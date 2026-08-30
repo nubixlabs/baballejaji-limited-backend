@@ -48,6 +48,8 @@ class SettingController extends Controller
     public function updateGeneral(Request $request): JsonResponse
     {
         $validated = $request->validate([
+            'company_name' => 'nullable|string|max:255',
+            'footer_text' => 'nullable|string|max:1000',
             'company_code' => 'nullable|string|max:10',
             'station_id' => 'nullable|string|max:10',
             'hash_key' => 'nullable|string',

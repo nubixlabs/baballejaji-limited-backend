@@ -52,7 +52,7 @@ class ShiftController extends Controller
             $query->where('shift_id', $request->shift_id);
         }
 
-        $shifts = $query->orderByDesc('date')->orderByDesc('id')->get();
+        $shifts = $query->with(['openedByUser', 'closedByUser', 'approvedByUser'])->orderByDesc('date')->orderByDesc('id')->get();
         return response()->json($shifts);
     }
 
@@ -96,7 +96,8 @@ class ShiftController extends Controller
                 if (isset($reading['product_name'])) {
                     $product = Product::where('name', $reading['product_name'])->first();
                     if ($product) {
-                        $retailPrice = $product->priceForStation($fillingStationId, 'retail_price') ?? 0;
+                        $stationId = $fillingStationId ?? $shift->filling_station_id;
+                        $retailPrice = $product->priceForStation($stationId, 'retail_price') ?? 0;
                     }
                 }
                 $retailSales += $qtySold * $retailPrice;
@@ -117,7 +118,8 @@ class ShiftController extends Controller
                 if (isset($reading['product_name'])) {
                     $product = Product::where('name', $reading['product_name'])->first();
                 }
-                $price = $product ? ($product->priceForStation($fillingStationId, 'retail_price') ?? 0) : 0;
+                $stationId = $fillingStationId ?? $shift->filling_station_id;
+                $price = $product ? ($product->priceForStation($stationId, 'retail_price') ?? 0) : 0;
                 $cashGiven += $qtySold * $price;
             }
         }
@@ -128,7 +130,8 @@ class ShiftController extends Controller
                 $productId = $sale['product_id'] ?? null;
                 $discount = $sale['discount'] ?? 0;
                 $product = $productId ? Product::find($productId) : null;
-                $price = $product ? ($product->priceForStation($fillingStationId, 'retail_price') ?? 0) : 0;
+                $stationId = $fillingStationId ?? $shift->filling_station_id;
+                $price = $product ? ($product->priceForStation($stationId, 'retail_price') ?? 0) : 0;
                 $creditSales += ($qty * $price) - $discount;
             }
         }
@@ -145,7 +148,8 @@ class ShiftController extends Controller
                 if (isset($reading['product_name'])) {
                     $product = Product::where('name', $reading['product_name'])->first();
                 }
-                $costPrice = $product ? ($product->priceForStation($fillingStationId, 'cost_price') ?? 0) : 0;
+                $stationId = $fillingStationId ?? $shift->filling_station_id;
+                $costPrice = $product ? ($product->priceForStation($stationId, 'cost_price') ?? 0) : 0;
                 $totalCost += $qtySold * $costPrice;
             }
         }
@@ -795,6 +799,7 @@ class ShiftController extends Controller
 
         // Get product prices map for quick lookup
         $products = Product::all()->keyBy('id');
+        $prevClosingPerNozzle = [];
 
         // Calculate total revenue from nozzle readings (qty_sold * retail_price)
         $nozzleReadings = $shift->nozzle_readings;
@@ -806,16 +811,50 @@ class ShiftController extends Controller
                 $qtySold = max(0, $closing - $opening - $rtt);
 
                 $nozzleId = $reading['nozzle_id'] ?? null;
+                if ($nozzleId) {
+                    $prevClosingPerNozzle[$nozzleId] = $closing;
+                }
+
                 $price = 0;
                 if ($nozzleId) {
                     $nozzle = \App\Models\Nozzle::with('tank.product')->find($nozzleId);
                     $product = $nozzle?->tank?->product;
+                    $stationId = $fillingStationId ?? $shift->filling_station_id;
                     $price = $product
-                        ? (float) ($product->priceForStation($fillingStationId ?? 0, 'retail_price') ?? 0)
+                        ? (float) ($product->priceForStation($stationId, 'retail_price') ?? 0)
                         : 0;
                 }
 
                 $totalRevenue += $qtySold * $price;
+            }
+        }
+
+        // Add revenue from additional readings
+        if (is_array($shift->additional_readings)) {
+            foreach ($shift->additional_readings as $snapshot) {
+                foreach ($snapshot['readings'] ?? [] as $r) {
+                    $closing = (float) ($r['closing_reading'] ?? 0);
+                    $rtt = (float) ($r['rtt'] ?? 0);
+                    $nozzleId = $r['nozzle_id'] ?? null;
+                    $opening = $prevClosingPerNozzle[$nozzleId] ?? 0;
+                    $qtySold = max(0, $closing - $opening - $rtt);
+
+                    if ($nozzleId) {
+                        $prevClosingPerNozzle[$nozzleId] = $closing;
+                    }
+
+                    $price = 0;
+                    if ($nozzleId) {
+                        $nozzle = \App\Models\Nozzle::with('tank.product')->find($nozzleId);
+                        $product = $nozzle?->tank?->product;
+                        $stationId = $fillingStationId ?? $shift->filling_station_id;
+                        $price = $product
+                            ? (float) ($product->priceForStation($stationId, 'retail_price') ?? 0)
+                            : 0;
+                    }
+
+                    $totalRevenue += $qtySold * $price;
+                }
             }
         }
 
@@ -827,10 +866,18 @@ class ShiftController extends Controller
                 $discount = (float) ($cs['discount'] ?? 0);
                 $productId = $cs['product_id'] ?? null;
                 $product = $productId ? ($products->get($productId) ?? Product::find($productId)) : null;
-                $price = $product ? (float) ($product->priceForStation($fillingStationId ?? 0, 'retail_price') ?? 0) : 0;
+                $stationId = $fillingStationId ?? $shift->filling_station_id;
+                $price = $product ? (float) ($product->priceForStation($stationId, 'retail_price') ?? 0) : 0;
                 $creditSalesTotal += max(0, ($qty * $price) - $discount);
             }
         }
+
+        // Add credit retail sales
+        $retailCreditSalesTotal = \App\Models\RetailSale::where('shift_id', $shift->id)
+            ->where('payment_method', 'credit')
+            ->sum('grand_total');
+        
+        $creditSalesTotal += $retailCreditSalesTotal;
 
         $cashSales = max(0, $totalRevenue - $creditSalesTotal);
 

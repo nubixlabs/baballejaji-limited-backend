@@ -26,7 +26,7 @@ class CustomerPaymentController extends Controller
             $query->where('payment_id', $request->payment_id);
         }
 
-        $payments = $query->orderByDesc('created_at')->get();
+        $payments = $query->orderByDesc('id')->get();
         return response()->json($payments);
     }
 

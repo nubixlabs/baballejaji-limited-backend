@@ -44,6 +44,9 @@ use App\Http\Controllers\VacationController;
 use App\Http\Controllers\PayslipController;
 use App\Http\Controllers\SalaryPaymentController;
 use App\Http\Controllers\BankTransferController;
+use App\Http\Controllers\Transport\FleetController;
+use App\Http\Controllers\Transport\TripController;
+use App\Http\Controllers\Transport\DashboardController as TransportDashboardController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -108,6 +111,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Filling Station - Products
     Route::prefix('filling')->group(function () {
+        Route::get('/dashboard/pending-actions', [DashboardController::class, 'pendingActions']);
         Route::get('/products', [ProductController::class, 'index']);
         Route::get('/products/{id}', [ProductController::class, 'show']);
         Route::post('/products', [ProductController::class, 'store']);
@@ -324,6 +328,8 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/payments', [PaymentController::class, 'store']);
         Route::put('/payments/{payment}', [PaymentController::class, 'update']);
         Route::delete('/payments/{payment}', [PaymentController::class, 'destroy']);
+        Route::post('/payments/{payment}/approve', [PaymentController::class, 'approve']);
+        Route::post('/payments/{payment}/reject', [PaymentController::class, 'reject']);
 
         // Bank Transfers
         Route::get('/bank-transfers', [BankTransferController::class, 'index']);
@@ -389,6 +395,28 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/salary-payments', [SalaryPaymentController::class, 'index']);
         Route::get('/salary-payments/export', [SalaryPaymentController::class, 'export']);
         Route::get('/salary-payments/export-pdf', [SalaryPaymentController::class, 'exportPdf']);
+    });
+
+    // Transport Management Module API Routes
+    Route::prefix('transport')->group(function () {
+        // Dashboard
+        Route::get('/dashboard/stats', [TransportDashboardController::class, 'getStats']);
+
+        // Fleet
+        Route::get('/fleet', [FleetController::class, 'index']);
+        Route::post('/fleet', [FleetController::class, 'store']);
+        Route::put('/fleet/{id}', [FleetController::class, 'update']);
+        Route::get('/fleet/types', [FleetController::class, 'getTypes']);
+        Route::post('/fleet/types', [FleetController::class, 'storeType']);
+
+        // Trips
+        Route::get('/trips', [TripController::class, 'index']);
+        Route::post('/trips', [TripController::class, 'store']);
+        Route::put('/trips/{id}', [TripController::class, 'update']);
+        Route::get('/trips/{id}/ledger', [TripController::class, 'getLedger']);
+        Route::post('/trips/{id}/ledger', [TripController::class, 'storeLedger']);
+        Route::patch('/trips/{id}/approve', [TripController::class, 'approve']);
+        Route::patch('/trips/{id}/reject', [TripController::class, 'reject']);
     });
     Route::get('/reports/supplier-performance', [ReportsController::class, 'supplierPerformance']);
     Route::get('/reports/inventory-analysis', [ReportsController::class, 'inventoryAnalysis']);

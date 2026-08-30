@@ -20,8 +20,12 @@ class PaymentController extends Controller
         $query = Payment::with(['supplier', 'purchase', 'creator', 'shift']);
 
         // Apply filters
-        if ($request->filled('supplier_id')) {
-            $query->where('supplier_id', $request->supplier_id);
+        if ($request->filled('shift_id')) {
+            $query->where('shift_id', $request->shift_id);
+        }
+
+        if ($request->filled('batch_id')) {
+            $query->where('batch_id', $request->batch_id);
         }
 
         if ($request->filled('status')) {
@@ -52,7 +56,7 @@ class PaymentController extends Controller
             });
         }
 
-        $payments = $query->orderBy('payment_date', 'desc')->get();
+        $payments = $query->orderBy('id', 'desc')->get();
 
         return response()->json([
             'success' => true,
@@ -61,19 +65,20 @@ class PaymentController extends Controller
                     'id' => $payment->id,
                     'payment_number' => $payment->payment_number,
                     'payment_date' => $payment->payment_date->format('Y-m-d'),
-                    'supplier' => $payment->supplier->name,
+                    'supplier' => $payment->supplier ? ['name' => $payment->supplier->name] : null,
                     'supplier_id' => $payment->supplier_id,
                     'purchase_id' => $payment->purchase_id,
                     'amount' => $payment->amount,
                     'payment_method' => $payment->payment_method,
                     'reference_number' => $payment->reference_number,
                     'shift_id' => $payment->shift_id,
+                    'batch_id' => $payment->batch_id,
                     'sales_revenue' => $payment->sales_revenue ?? $payment->shift?->sales_revenue ?? 0,
                     'paid_by' => $payment->paid_by,
                     'received_by' => $payment->received_by,
                     'details' => $payment->details,
                     'status' => $payment->status,
-                    'created_by' => $payment->creator->name ?? 'System',
+                    'creator' => $payment->creator ? ['name' => $payment->creator->name] : null,
                     'created_at' => $payment->created_at->format('Y-m-d H:i:s'),
                 ];
             })
@@ -87,12 +92,13 @@ class PaymentController extends Controller
     {
         $validated = $request->validate([
             'payment_date' => 'required|date',
-            'supplier_id' => 'required|exists:suppliers,id',
+            'supplier_id' => 'nullable|exists:suppliers,id',
             'purchase_id' => 'nullable|exists:purchases,id',
             'amount' => 'required|numeric|min:0.01',
             'payment_method' => 'required|in:cash,bank_transfer,pos_transfer,expenses,credit_sale,other',
             'reference_number' => 'nullable|string|max:255',
             'shift_id' => 'nullable|string|max:50',
+            'batch_id' => 'nullable|string|max:255',
             'sales_revenue' => 'nullable|numeric|min:0',
             'paid_by' => 'nullable|string|max:255',
             'received_by' => 'nullable|string|max:255',
@@ -113,12 +119,13 @@ class PaymentController extends Controller
             $payment = Payment::create([
                 'payment_number' => Payment::generatePaymentNumber(),
                 'payment_date' => $validated['payment_date'],
-                'supplier_id' => $validated['supplier_id'],
+                'supplier_id' => $validated['supplier_id'] ?? null,
                 'purchase_id' => $validated['purchase_id'] ?? null,
                 'amount' => $validated['amount'],
                 'payment_method' => $validated['payment_method'],
                 'reference_number' => $validated['reference_number'] ?? null,
                 'shift_id' => $validated['shift_id'] ?? null,
+                'batch_id' => $validated['batch_id'] ?? null,
                 'sales_revenue' => $validated['sales_revenue'] ?? null,
                 'paid_by' => $validated['paid_by'] ?? null,
                 'received_by' => $validated['received_by'] ?? null,
@@ -183,7 +190,7 @@ class PaymentController extends Controller
 
         $validated = $request->validate([
             'payment_date' => 'required|date',
-            'supplier_id' => 'required|exists:suppliers,id',
+            'supplier_id' => 'nullable|exists:suppliers,id',
             'purchase_id' => 'nullable|exists:purchases,id',
             'amount' => 'required|numeric|min:0.01',
             'payment_method' => 'required|in:cash,bank_transfer,pos_transfer,expenses,credit_sale,other',
@@ -256,6 +263,44 @@ class PaymentController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Payment deleted successfully'
+        ]);
+    }
+
+    /**
+     * Approve the specified payment.
+     */
+    public function approve(Payment $payment): JsonResponse
+    {
+        $payment->status = 'completed';
+        $payment->save();
+
+        if (auth()->user()) {
+            auth()->user()->logActivity('payment_approved', "Approved payment: {$payment->payment_number}");
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Payment approved successfully',
+            'data' => $payment->load(['supplier', 'purchase', 'creator'])
+        ]);
+    }
+
+    /**
+     * Reject the specified payment.
+     */
+    public function reject(Payment $payment): JsonResponse
+    {
+        $payment->status = 'cancelled';
+        $payment->save();
+
+        if (auth()->user()) {
+            auth()->user()->logActivity('payment_rejected', "Rejected payment: {$payment->payment_number}");
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Payment rejected successfully',
+            'data' => $payment->load(['supplier', 'purchase', 'creator'])
         ]);
     }
 }

@@ -12,10 +12,9 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        $middleware->use([
-            \Illuminate\Http\Middleware\HandleCors::class,
-        ]);
+    $middleware->append(\Illuminate\Http\Middleware\HandleCors::class);
     })
+    
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->render(function (Throwable $e, $request) {
             if ($request->is('api/*')) {

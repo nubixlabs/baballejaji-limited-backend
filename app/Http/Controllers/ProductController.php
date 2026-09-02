@@ -184,7 +184,7 @@ class ProductController extends Controller
             $stationIds = $request->filling_station_ids ?? [];
         }
 
-        if (!$validated['filling_station_id'] && !empty($stationIds)) {
+        if (empty($validated['filling_station_id']) && !empty($stationIds)) {
             $validated['filling_station_id'] = $stationIds[0];
         }
 
@@ -199,7 +199,7 @@ class ProductController extends Controller
                 $syncData[$stationId] = $pivotPrices;
             }
             $product->fillingStations()->sync($syncData);
-        } elseif ($validated['filling_station_id']) {
+        } elseif (!empty($validated['filling_station_id'])) {
             $product->fillingStations()->sync([$validated['filling_station_id'] => $pivotPrices]);
         }
 

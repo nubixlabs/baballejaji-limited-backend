@@ -296,7 +296,8 @@ class ShiftController extends Controller
         // Use provided nozzle readings if any, otherwise snapshot from DB
         if ($request->has('nozzle_readings') && is_array($request->nozzle_readings)) {
             $providedReadings = $request->nozzle_readings;
-            $nozzles = \App\Models\Nozzle::with('tank.product')->get();
+            $providedIds = collect($providedReadings)->pluck('nozzle_id')->filter()->toArray();
+            $nozzles = \App\Models\Nozzle::with('tank.product')->whereIn('id', $providedIds)->get();
             $nozzleReadings = [];
             foreach ($nozzles as $nozzle) {
                 $provided = collect($providedReadings)->firstWhere('nozzle_id', $nozzle->id);

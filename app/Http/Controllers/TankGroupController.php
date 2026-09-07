@@ -57,8 +57,17 @@ class TankGroupController extends Controller
      */
     public function store(Request $request)
     {
+        $stationId = $request->header('X-Filling-Station-Id');
+        
         $validated = $request->validate([
-            'name' => 'required|string|max:255|unique:tank_groups,name',
+            'name' => [
+                'required',
+                'string',
+                'max:255',
+                \Illuminate\Validation\Rule::unique('tank_groups', 'name')->where(function ($query) use ($stationId) {
+                    return $query->where('filling_station_id', $stationId);
+                })
+            ],
             'description' => 'nullable|string',
         ]);
 
@@ -85,9 +94,18 @@ class TankGroupController extends Controller
     public function update(Request $request, int $id)
     {
         $group = TankGroup::findOrFail($id);
+        $stationId = $request->header('X-Filling-Station-Id');
 
         $validated = $request->validate([
-            'name' => 'sometimes|required|string|max:255|unique:tank_groups,name,' . $id,
+            'name' => [
+                'sometimes',
+                'required',
+                'string',
+                'max:255',
+                \Illuminate\Validation\Rule::unique('tank_groups', 'name')->where(function ($query) use ($stationId) {
+                    return $query->where('filling_station_id', $stationId);
+                })->ignore($id)
+            ],
             'description' => 'nullable|string',
         ]);
 

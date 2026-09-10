@@ -18,7 +18,7 @@ class TankGroupController extends Controller
      */
     public function index()
     {
-        $groups = TankGroup::orderBy('name')->get();
+        $groups = TankGroup::with('tanks')->orderBy('name')->get();
         return response()->json($groups);
     }
 
@@ -34,7 +34,7 @@ class TankGroupController extends Controller
      */
     public function show(int $id)
     {
-        $group = TankGroup::findOrFail($id);
+        $group = TankGroup::with('tanks')->findOrFail($id);
         return response()->json($group);
     }
 

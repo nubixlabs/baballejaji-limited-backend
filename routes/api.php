@@ -314,6 +314,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::put('/customer-payments/{id}', [CustomerPaymentController::class, 'update']);
         Route::delete('/customer-payments/{id}', [CustomerPaymentController::class, 'destroy']);
         Route::post('/customer-payments/{id}/approve', [CustomerPaymentController::class, 'approve']);
+        Route::post('/customer-payments/{id}/reject', [CustomerPaymentController::class, 'reject']);
 
         // Fuel Tickets
         Route::get('/fuel-tickets', [App\Http\Controllers\FuelTicketController::class, 'index']);

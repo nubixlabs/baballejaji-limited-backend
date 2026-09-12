@@ -211,4 +211,36 @@ class CustomerPaymentController extends Controller
         
         return response()->json($payment->load('approver'));
     }
+
+    public function reject($id)
+    {
+        $payment = CustomerPayment::findOrFail($id);
+        
+        if ($payment->status === 'rejected') {
+            return response()->json($payment->load('approver'));
+        }
+
+        DB::beginTransaction();
+        try {
+            $payment->status = 'rejected';
+            $payment->last_modified_by = auth()->id();
+            $payment->save();
+            
+            // Revert balance change if customer exists
+            if ($payment->customer_id) {
+                $customer = Customer::find($payment->customer_id);
+                if ($customer) {
+                    $customer->credit_balance = $customer->credit_balance + $payment->amount;
+                    $customer->save();
+                }
+            }
+
+            DB::commit();
+            return response()->json($payment->load('approver'));
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json(['message' => 'Error rejecting payment: ' . $e->getMessage()], 500);
+        }
+    }
 }

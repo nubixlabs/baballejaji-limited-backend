@@ -20,10 +20,8 @@ class TripPaymentController extends Controller
             $query->where('status', $request->status);
         }
 
-        return response()->json([
-            'status' => 'success',
-            'data' => $query->orderBy('created_at', 'desc')->paginate(15)
-        ]);
+        $payments = $query->orderBy('created_at', 'desc')->paginate(15);
+        return response()->json($payments);
     }
 
     public function store(Request $request)

@@ -27,4 +27,9 @@ class Trip extends Model
     {
         return $this->hasMany(TripLedger::class);
     }
+
+    public function payments()
+    {
+        return $this->hasMany(TripPayment::class);
+    }
 }

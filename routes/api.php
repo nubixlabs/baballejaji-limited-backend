@@ -418,6 +418,12 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/trips/{id}/ledger', [TripController::class, 'storeLedger']);
         Route::patch('/trips/{id}/approve', [TripController::class, 'approve']);
         Route::patch('/trips/{id}/reject', [TripController::class, 'reject']);
+
+        // Payments
+        Route::get('/payments', [App\Http\Controllers\Transport\TripPaymentController::class, 'index']);
+        Route::post('/payments', [App\Http\Controllers\Transport\TripPaymentController::class, 'store']);
+        Route::patch('/payments/{id}/approve', [App\Http\Controllers\Transport\TripPaymentController::class, 'approve']);
+        Route::patch('/payments/{id}/reject', [App\Http\Controllers\Transport\TripPaymentController::class, 'reject']);
     });
     Route::get('/reports/supplier-performance', [ReportsController::class, 'supplierPerformance']);
     Route::get('/reports/inventory-analysis', [ReportsController::class, 'inventoryAnalysis']);
